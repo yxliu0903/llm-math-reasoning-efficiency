@@ -1,7 +1,10 @@
 <!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>近两年 arXiv：大语言模型数学推理冗长问题综述</title><style>
 :root{color-scheme:light;--ink:#18212b;--muted:#586779;--line:#d8e0e8;--accent:#0b63ce;--bg:#f6f8fb;--card:#fff}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC","Microsoft YaHei",sans-serif;line-height:1.72}main{max-width:1100px;margin:0 auto;padding:36px 24px 72px;background:var(--card);min-height:100vh}h1{font-size:2rem;line-height:1.3;border-bottom:2px solid var(--ink);padding-bottom:18px}h2{margin-top:42px;padding-bottom:8px;border-bottom:1px solid var(--line)}h3{margin-top:30px;color:#173f70}p{margin:12px 0}a{color:var(--accent)}blockquote{margin:20px 0;padding:14px 20px;border-left:4px solid var(--accent);background:#eef5ff;color:#32465b}table{width:100%;border-collapse:collapse;margin:18px 0;font-size:.94rem}th,td{border:1px solid var(--line);padding:8px 10px;vertical-align:top;text-align:left}th{background:#edf3f9}code{background:#f0f3f7;padding:2px 5px;border-radius:4px}pre{overflow:auto;background:#111827;color:#e5e7eb;padding:16px;border-radius:8px}li{margin:5px 0}.toc{background:#f7fafc}
-</style></head><body><main><h1 id="arxiv">近两年 arXiv：大语言模型数学推理冗长问题研究综述</h1>
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC","Microsoft YaHei",sans-serif;line-height:1.72}main{max-width:1100px;margin:0 auto;padding:36px 24px 72px;background:var(--card);min-height:100vh}h1{font-size:2rem;line-height:1.3;border-bottom:2px solid var(--ink);padding-bottom:18px}h2{margin-top:42px;padding-bottom:8px;border-bottom:1px solid var(--line)}h3{margin-top:30px;color:#173f70}p{margin:12px 0}a{color:var(--accent)}blockquote{margin:20px 0;padding:14px 20px;border-left:4px solid var(--accent);background:#eef5ff;color:#32465b}table{width:100%;border-collapse:collapse;margin:18px 0;font-size:.94rem}th,td{border:1px solid var(--line);padding:8px 10px;vertical-align:top;text-align:left}th{background:#edf3f9}code{background:#f0f3f7;padding:2px 5px;border-radius:4px}pre{overflow:auto;background:#111827;color:#e5e7eb;padding:16px;border-radius:8px}li{margin:5px 0}.toc{background:#f7fafc}.MathJax{font-size:1.05em}
+</style>
+<script>window.MathJax={tex:{inlineMath:[['\\(','\\)']],displayMath:[['\\[','\\]']],processEscapes:false},options:{skipHtmlTags:['script','noscript','style','textarea','pre','code']}};</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head><body><main><h1 id="arxiv">近两年 arXiv：大语言模型数学推理冗长问题研究综述</h1>
 <blockquote>
 <p>检索截止：2026-10-10 UTC。近两年窗口：2024-10-10—2026-10-10；“近半年”窗口：2026-04-10—2026-10-10。本文把“冗长”定义为显式 CoT token/step 过多、答案收敛后的无效继续推理、统一预算导致的过度/不足思考、KV/上下文累积，或为降低上述成本而采用的显式压缩/潜在推理/自适应停止方法。</p>
 </blockquote>
@@ -15,11 +18,11 @@
 <li><strong>系统级降本</strong>：KV cache 合并/预算分配、量化后 overthinking 修正、共享预算和成本评测。</li>
 </ol>
 <p>统一目标可写成
-[
+\[
 \max_\pi \; \mathbb E[A(y|x)]-\lambda\,\mathbb E[L(y|x)],\qquad
 \text{s.t. }\mathbb E[L]\le B,
-]
-其中 (A) 是答案正确率，(L) 是思考 token、步骤、FLOPs 或 latency。真正困难在于 (A(L)) 通常是倒 U 型：短了欠思考，长了过思考；而且 (L^*(x)) 随问题难度和模型能力变化。若只用 (r=A-\lambda L)，策略很容易学会“少说但漏掉关键步骤”。</p>
+\]
+其中 \(A\) 是答案正确率，\(L\) 是思考 token、步骤、FLOPs 或 latency。真正困难在于 \(A(L)\) 通常是倒 U 型：短了欠思考，长了过思考；而且 \(L^*(x)\) 随问题难度和模型能力变化。若只用 \(r=A-\lambda L\)，策略很容易学会“少说但漏掉关键步骤”。</p>
 <h2 id="_2">检索与边界</h2>
 <p>我用 OpenAlex 的全文搜索做候选发现，再用多组主题词（<code>long/overthinking/concise reasoning</code>、<code>CoT compression</code>、<code>token budget</code>、<code>adaptive reasoning</code>、<code>early stopping</code>、<code>latent reasoning</code>、<code>test-time compute</code>、<code>mathematical reasoning</code>）交叉检索；所有纳入条目用 arXiv ID、PDF 和版本首发日期去重。宽检索得到 421 条含相关词的候选，标题直接命中长度/预算/压缩/早停/高效推理的两年候选为 202 条，严格近半年核心与边界清单为 51 条。多模态视觉 token 剪枝、纯攻击论文、只提高数学准确率但没有长度/计算效率变量的论文不进入核心结论；它们在清单中保留并标注“邻接”。arXiv 会持续更新，下面是截至日期的可复核快照，不能把“全面”理解成数学上证明绝对没有漏项。</p>
 <h2 id="_3">近半年分类总览</h2>
@@ -89,19 +92,19 @@
 <h2 id="2026-04-102026-10-10">近半年逐篇分析（2026-04-10—2026-10-10）</h2>
 <p>以下每条都按“方法—动机/目标—缺陷与新问题—结论”写。数字是论文自报结果，尚未做统一硬件复现实验。</p>
 <h3 id="1-stack-think-less-know-morearxiv2604091502026-04-10">1. STACK — Think Less, Know More（arXiv:2604.09150，2026-04-10）</h3>
-<p><strong>方法。</strong> STACK 对每个 reasoning state 做 step-wise 压缩：在线构造 long/short 对比样本；状态不确定或有 reasoning bias 时调用检索知识指导压缩，状态已经正确但过长时用 self-prompted compression；再以答案收敛作为早停信号。训练将 PPO 与 DPO 的 reward difference 结合，让策略学习“按状态选压缩器”。可抽象为 (a_t\in{\text{retrieve-compress},\text{self-compress},\text{continue}})，最大化 (R=A-\lambda L)。</p>
+<p><strong>方法。</strong> STACK 对每个 reasoning state 做 step-wise 压缩：在线构造 long/short 对比样本；状态不确定或有 reasoning bias 时调用检索知识指导压缩，状态已经正确但过长时用 self-prompted compression；再以答案收敛作为早停信号。训练将 PPO 与 DPO 的 reward difference 结合，让策略学习“按状态选压缩器”。可抽象为 \(a_t\in\{\text{retrieve-compress},\text{self-compress},\text{continue}\}\)，最大化 \(R=A-\lambda L\)。</p>
 <p><strong>动机/目标。</strong> 统一压缩把关键自纠错步骤和重复核验一视同仁；STACK 假设冗余来源随推理阶段变化。作者在三个数学基准报告平均长度降 59.9%、准确率升 4.8 个百分点。</p>
 <p><strong>缺陷/新问题。</strong> 在线对比采样和检索带来训练开销；检索错误会把偏置写入压缩轨迹，频繁检索还会增大上下文、稀释注意力。它依赖可验证答案和文本知识，开放题、工具/多模态场景的“状态标签”并不可靠；PPO+DPO 的两个信号可能互相争夺梯度。新问题是：压缩器学到的是通用冗余还是某个 benchmark 的检索模板？</p>
 <h3 id="2-when-more-thinking-hurts2604107392026-04-12">2. When More Thinking Hurts（2604.10739，2026-04-12）</h3>
-<p><strong>方法。</strong> 这是诊断和成本评测框架而非训练器：测 (\Delta A/\Delta L) 随预算的边际收益，记录“先得到正确答案、随后又放弃”的 harmful overthinking，并按难度估计每题最优思考长度。停止中等预算即可维持准确率。</p>
+<p><strong>方法。</strong> 这是诊断和成本评测框架而非训练器：测 \(\Delta A/\Delta L\) 随预算的边际收益，记录“先得到正确答案、随后又放弃”的 harmful overthinking，并按难度估计每题最优思考长度。停止中等预算即可维持准确率。</p>
 <p><strong>动机/目标。</strong> 反驳“更多 token 单调更好”的默认假设，为动态停止提供曲线证据。</p>
 <p><strong>缺陷/新问题。</strong> 诊断依赖可强制截断和可解析答案；边际收益会随解码温度、模型版本、答案抽取器改变。它告诉我们哪里该停，却没有可部署的 stopping policy；如果直接把观察到的最优长度硬编码，会在分布外题目上欠思考。</p>
 <h3 id="3-adacompute2604148532026-04-16">3. AdaCompute（2604.14853，2026-04-16）</h3>
-<p><strong>方法。</strong> 将问题级分配写为约束优化：(\max \sum_i A_i(a_i)) s.t. (rac1n\sum_i C_i(a_i)\le B)。Lagrangian (A_i(a)-\eta C_i(a)) 使每题有 oracle action，利用成本关于 (\eta) 的单调性二分精确命中预算；再用轻量分类器从便宜特征预测 oracle action（SOLVE-THEN-LEARN）。</p>
+<p><strong>方法。</strong> 将问题级分配写为约束优化：\(\max \sum_i A_i(a_i)\) s.t. \(\frac{1}{n}\sum_i C_i(a_i)\le B\)。Lagrangian \(A_i(a)-\eta C_i(a)\) 使每题有 oracle action，利用成本关于 \(\eta\) 的单调性二分精确命中预算；再用轻量分类器从便宜特征预测 oracle action（SOLVE-THEN-LEARN）。</p>
 <p><strong>动机/目标。</strong> uniform rollout 把预算浪费在简单题、不给难题足够计算。MATH/GSM8K 报告相同预算下最高约 12.8% 相对准确率提升，模仿准确率超过 91%。</p>
 <p><strong>缺陷/新问题。</strong> oracle 需要先为每题跑多种动作，离线成本高；分类器误差在 action gap 大的题上会放大 regret。平均预算约束可能牺牲尾部难题或高价值题，且训练分布固定，不能处理题目价值不同的在线队列。</p>
 <h3 id="4-trace2604173042026-04-19">4. TRACE（2604.17304，2026-04-19）</h3>
-<p><strong>方法。</strong> 训练-free 地聚合最近多个步骤的答案一致性与置信度轨迹：不是看单点 (p_t)，而是看窗口内的持久性/趋势，满足双信号阈值才停止。报告 token 降 25–30%，准确率损失 1–2%。</p>
+<p><strong>方法。</strong> 训练-free 地聚合最近多个步骤的答案一致性与置信度轨迹：不是看单点 \(p_t\)，而是看窗口内的持久性/趋势，满足双信号阈值才停止。报告 token 降 25–30%，准确率损失 1–2%。</p>
 <p><strong>动机/目标。</strong> 单步 confidence 在多步自纠错中会抖动；时间聚合更接近“已经收敛”。</p>
 <p><strong>缺陷/新问题。</strong> 一致的错误答案会触发过早停止，难题的正确答案可能在短暂低置信后出现；窗口大小和阈值对模型/温度敏感。它只观察答案分布，无法判断证明结构是否完整，可能留下“答案对但过程断裂”的前缀。</p>
 <h3 id="5-crisp2604172972026-04-19">5. CRISP（2604.17297，2026-04-19）</h3>
@@ -137,7 +140,7 @@
 <p><strong>动机/目标。</strong> 静态 reward 权重在 RL 过程中不适配，global length 不反映每题预算。论文报告五个数学基准上较高 accuracy-efficiency score。</p>
 <p><strong>缺陷/新问题。</strong> target length 由当前模型产生，容易自我确认和累积偏差；instability 的尺度跨题、跨模型不稳定。对罕见难题，最短正确 rollout 可能不存在，反而诱导 underthinking。</p>
 <h3 id="13-vpg-ea2605110192026-05-10">13. VPG-EA（2605.11019，2026-05-10）</h3>
-<p><strong>方法。</strong> 将高效推理视为变分推断：参考答案条件下的 posterior 比 prior 更容易采到高效正确路径；共享参数的 dual-stream 同时建模 posterior/prior，用 cross-view 过滤伪高效路径，再做 variational distillation。效率感知 ELBO 近似 (\mathbb E_q[\log p(y|x,z)]-eta KL(q||p)-\lambda L(z))。</p>
+<p><strong>方法。</strong> 将高效推理视为变分推断：参考答案条件下的 posterior 比 prior 更容易采到高效正确路径；共享参数的 dual-stream 同时建模 posterior/prior，用 cross-view 过滤伪高效路径，再做 variational distillation。效率感知 ELBO 近似 \(\mathbb E_q[\log p(y|x,z)]-\beta KL(q||p)-\lambda L(z)\)。</p>
 <p><strong>动机/目标。</strong> 复杂 reward 令高质量短轨迹稀疏，prior exploration 采样瓶颈；posterior 提供密集方向。</p>
 <p><strong>缺陷/新问题。</strong> 推理时不可用的 answer-conditioned posterior 依赖高质量 reference；cross-view filter 错误会把捷径当高效。双流共享参数仍增加训练显存，ELBO 的 KL/长度权重改变后可能牺牲探索多样性。</p>
 <h3 id="14-puma2605176722026-05-17">14. PUMA（2605.17672，2026-05-17）</h3>
@@ -217,7 +220,7 @@
 <p><strong>动机/目标。</strong> uniform length reduction 在难题上伤害准确率；模型自身不确定性是无需额外 difficulty label 的路由信号。</p>
 <p><strong>缺陷/新问题。</strong> LRM 的 confidence 可能系统性过信，尤其量化、OOD 或错误但流畅的轨迹；偏好优化会把 calibration error 变成长度决策。简单题的高 confidence 也可能是 shortcut。</p>
 <h3 id="33-os-pruner2607110892026-07-13">33. OS-Pruner（2607.11089，2026-07-13）</h3>
-<p><strong>方法。</strong> 将每个 prefix 的继续/停止建模为 optimal stopping，学习显式 utility (U_i=P(\text{correct}|y_{\le i})-\lambda c_i)，而不是只对 answer correctness 做阈值分类；只微调小 policy head/末层，推理按 step boundary 调用。报告 20–60% generation reduction。</p>
+<p><strong>方法。</strong> 将每个 prefix 的继续/停止建模为 optimal stopping，学习显式 utility \(U_i=P(\text{correct}|y_{\le i})-\lambda c_i\)，而不是只对 answer correctness 做阈值分类；只微调小 policy head/末层，推理按 step boundary 调用。报告 20–60% generation reduction。</p>
 <p><strong>动机/目标。</strong> 固定预算、启发式过滤和 correctness threshold 会错过“当前答案错但继续能纠正”的状态；最优停止要比较继续的期望价值。</p>
 <p><strong>缺陷/新问题。</strong> 学到的 continuation value 受训练 horizon 和成本权重影响；policy head 误差在长链累积。论文主要是数学，&gt;20B 和代码/科学泛化未验证；停止后保留的 prefix 可能不可读。</p>
 <h3 id="34-token-budget-saturation2607214332026-07-23">34. Token-budget saturation（2607.21433，2026-07-23）</h3>
@@ -257,7 +260,7 @@
 <p><strong>动机/目标。</strong> 只惩罚 token 会产生 pseudo-conciseness：字数少了，重复逻辑还在；树结构可共享前缀并保留分支信息。</p>
 <p><strong>缺陷/新问题。</strong> 树合并的 cosine/entropy 阈值是启发式，错误合并会把不同证明分支混为一谈；DPO 的 log-prob 梯度纠缠可能同时降低 chosen/rejected，论文自己观察理想梯度条件罕见。离线多路径搜索昂贵。</p>
 <h3 id="43-token-economy-score2608262352026-08-26">43. Token Economy Score（2608.26235，2026-08-26）</h3>
-<p><strong>方法。</strong> 定义 TES = ((A_{reason}-A_{base})/(L_{reason}/L_{base}))，并辅以 Reasoning Cost Share、Deployment Cost Multiplier；151 次运行显示任务结构比名义难度更能预测 reasoning efficiency，高 effort 会边际递减甚至降准确率。</p>
+<p><strong>方法。</strong> 定义 TES = \((A_{reason}-A_{base})/(L_{reason}/L_{base})\)，并辅以 Reasoning Cost Share、Deployment Cost Multiplier；151 次运行显示任务结构比名义难度更能预测 reasoning efficiency，高 effort 会边际递减甚至降准确率。</p>
 <p><strong>动机/目标。</strong> accuracy-only benchmark 不回答“额外 thinking 值不值”；为模型选择和部署提供经济指标。</p>
 <p><strong>缺陷/新问题。</strong> base model 配对、tokenizer、硬件价格会改变分母；线性 token multiplier 忽略 KV、并行采样和服务 batching。TES 是评测指标，不会自动降低冗余，且可能鼓励牺牲难题准确率换高分。</p>
 <h3 id="44-aera2608279642026-08-28">44. AERA（2608.27964，2026-08-28）</h3>
@@ -285,7 +288,7 @@
 <p><strong>动机/目标。</strong> 仅改 scorer 不会改变 keep-set；行为保持的结构合并比排名淘汰更适合长推理。</p>
 <p><strong>缺陷/新问题。</strong> core/scratch 的边界依赖任务和答案形成阶段；合并 scratch 可能破坏跨步引用。主要报告 KV continuation fidelity，不等于完整数学准确率和端到端成本。</p>
 <h3 id="50-reasonalloccask">50. ReasonAlloc/CASK 类系统工作的共同边界</h3>
-<p>二者都说明“缓存 token 数”与“推理 token 数”是耦合的：保留更多上下文可能减少重算，删得太多会诱发更长轨迹。部署时应报告 (\text{latency}=T_{prefill}+T_{decode}+T_{KV\ ops})，不能只报告 CoT 长度。它们是数学推理效率的系统层补充，而非替代语义压缩。</p>
+<p>二者都说明“缓存 token 数”与“推理 token 数”是耦合的：保留更多上下文可能减少重算，删得太多会诱发更长轨迹。部署时应报告 \(\text{latency}=T_{prefill}+T_{decode}+T_{KV\ ops}\)，不能只报告 CoT 长度。它们是数学推理效率的系统层补充，而非替代语义压缩。</p>
 <h3 id="51-longcotthought-streams-token">51. 近半年邻接诊断：LongCoT、Thought Streams、共享预算与深思 token</h3>
 <p>LongCoT（2604.14140）用可验证的超长 horizon 基准测几十万 token 的失败；Thought Streams（2604.11177）显示大部分收益集中在前几百 token，并警告压缩步会产生 hallucination；Deep-Thinking Tokens（2602.13517，首发在近半年窗口内）以跨层预测修订比例而非 raw length 衡量 effort；这些工作没有直接压缩数学 CoT，但决定了 future stopper 应监测“真正计算量”而非表面 token。其共同缺陷是评测变量与内部思考并不等价，跨模型解释仍待验证。</p>
 <h2 id="2024-10-102026-04-09">两年窗口的完整候选清单（2024-10-10—2026-04-09）</h2>
@@ -988,13 +991,13 @@
 <ol>
 <li><strong>“答案正确”不等于“推理充分”。</strong> 早停监督大多依赖最终答案 verifier，容易训练出早答、后解释或不可审计 latent state。</li>
 <li><strong>长度不是冗余的充分统计量。</strong> 重复 token、必要自纠错、低概率关键跳转在表面长度上不可分；entropy/logprob/attention 单信号都被近期反例削弱。</li>
-<li><strong>平均预算掩盖尾部风险。</strong> 共享预算和难题分配需要 risk-sensitive objective，例如最大化 (\sum_i v_i A_i) 同时控制 P99 latency，而非只约束平均 token。</li>
+<li><strong>平均预算掩盖尾部风险。</strong> 共享预算和难题分配需要 risk-sensitive objective，例如最大化 \(\sum_i v_i A_i\) 同时控制 P99 latency，而非只约束平均 token。</li>
 <li><strong>训练节省与推理节省不同。</strong> 许多 compression 方法离线需要多 rollout、教师重写、检索或树搜索；应同时报告 data-construction FLOPs、训练 FLOPs、prefill/decode latency 和 KV memory。</li>
 <li><strong>数学 benchmark 的可验证性造成选择偏差。</strong> 结论常在 GSM8K/MATH/AIME 成立；开放数学证明、形式 Lean、工具调用和多语言题仍需验证。</li>
 <li><strong>监控与忠实性冲突。</strong> latent/abstract/function token 能降成本，却让人类和 verifier 难以检查；短 CoT 可能只是把错误藏到不可见状态。</li>
 </ol>
 <h2 id="_7">研究复现建议</h2>
-<p>若要在自己的模型上比较方法，建议固定同一问题集、随机种子、temperature、答案抽取器和硬件；画出每个方法的 ((\text{accuracy},\text{mean tokens},\text{P95 latency},\text{KV memory})) Pareto 曲线，并分别报告 easy/medium/hard、首次正确 prefix、答案后 token、以及被早停后重新从头生成的反事实。不要用单一“平均 token 降幅”宣称方法优越。</p>
+<p>若要在自己的模型上比较方法，建议固定同一问题集、随机种子、temperature、答案抽取器和硬件；画出每个方法的 \((\text{accuracy},\text{mean tokens},\text{P95 latency},\text{KV memory})\) Pareto 曲线，并分别报告 easy/medium/hard、首次正确 prefix、答案后 token、以及被早停后重新从头生成的反事实。不要用单一“平均 token 降幅”宣称方法优越。</p>
 <h2 id="_8">证据文件</h2>
 <p>本轮机器可复核产物位于：</p>
 <ul>
