@@ -1,0 +1,1010 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>近两年 arXiv：大语言模型数学推理冗长问题综述</title><style>
+:root{color-scheme:light;--ink:#18212b;--muted:#586779;--line:#d8e0e8;--accent:#0b63ce;--bg:#f6f8fb;--card:#fff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC","Microsoft YaHei",sans-serif;line-height:1.72}main{max-width:1100px;margin:0 auto;padding:36px 24px 72px;background:var(--card);min-height:100vh}h1{font-size:2rem;line-height:1.3;border-bottom:2px solid var(--ink);padding-bottom:18px}h2{margin-top:42px;padding-bottom:8px;border-bottom:1px solid var(--line)}h3{margin-top:30px;color:#173f70}p{margin:12px 0}a{color:var(--accent)}blockquote{margin:20px 0;padding:14px 20px;border-left:4px solid var(--accent);background:#eef5ff;color:#32465b}table{width:100%;border-collapse:collapse;margin:18px 0;font-size:.94rem}th,td{border:1px solid var(--line);padding:8px 10px;vertical-align:top;text-align:left}th{background:#edf3f9}code{background:#f0f3f7;padding:2px 5px;border-radius:4px}pre{overflow:auto;background:#111827;color:#e5e7eb;padding:16px;border-radius:8px}li{margin:5px 0}.toc{background:#f7fafc}
+</style></head><body><main><h1 id="arxiv">近两年 arXiv：大语言模型数学推理冗长问题研究综述</h1>
+<blockquote>
+<p>检索截止：2026-10-10 UTC。近两年窗口：2024-10-10—2026-10-10；“近半年”窗口：2026-04-10—2026-10-10。本文把“冗长”定义为显式 CoT token/step 过多、答案收敛后的无效继续推理、统一预算导致的过度/不足思考、KV/上下文累积，或为降低上述成本而采用的显式压缩/潜在推理/自适应停止方法。</p>
+</blockquote>
+<h2 id="_1">先给结论</h2>
+<p>研究已经从“给长度加惩罚”转向“识别何时、哪一步、哪一种 token 是冗余”。现有方法可以归为五个层次：</p>
+<ol>
+<li><strong>问题级预算路由</strong>：根据难度、置信度或未来收益在 NoThink/Short/Long 或不同 rollout 数之间分配预算。</li>
+<li><strong>轨迹级早停</strong>：检测答案稳定、语义重复、回溯爆发或注意力状态，在收益低于 token 成本时停止。</li>
+<li><strong>内容级/训练期压缩</strong>：从正确轨迹中删除重复段、蒸馏短轨迹，或用分段 credit assignment 把“得到答案”和“答案后的废话”分开。</li>
+<li><strong>表示级压缩</strong>：把可压缩 span 变为 latent/abstract/function token，或者用几何连续状态代替离散文字。</li>
+<li><strong>系统级降本</strong>：KV cache 合并/预算分配、量化后 overthinking 修正、共享预算和成本评测。</li>
+</ol>
+<p>统一目标可写成
+[
+\max_\pi \; \mathbb E[A(y|x)]-\lambda\,\mathbb E[L(y|x)],\qquad
+\text{s.t. }\mathbb E[L]\le B,
+]
+其中 (A) 是答案正确率，(L) 是思考 token、步骤、FLOPs 或 latency。真正困难在于 (A(L)) 通常是倒 U 型：短了欠思考，长了过思考；而且 (L^*(x)) 随问题难度和模型能力变化。若只用 (r=A-\lambda L)，策略很容易学会“少说但漏掉关键步骤”。</p>
+<h2 id="_2">检索与边界</h2>
+<p>我用 OpenAlex 的全文搜索做候选发现，再用多组主题词（<code>long/overthinking/concise reasoning</code>、<code>CoT compression</code>、<code>token budget</code>、<code>adaptive reasoning</code>、<code>early stopping</code>、<code>latent reasoning</code>、<code>test-time compute</code>、<code>mathematical reasoning</code>）交叉检索；所有纳入条目用 arXiv ID、PDF 和版本首发日期去重。宽检索得到 421 条含相关词的候选，标题直接命中长度/预算/压缩/早停/高效推理的两年候选为 202 条，严格近半年核心与边界清单为 51 条。多模态视觉 token 剪枝、纯攻击论文、只提高数学准确率但没有长度/计算效率变量的论文不进入核心结论；它们在清单中保留并标注“邻接”。arXiv 会持续更新，下面是截至日期的可复核快照，不能把“全面”理解成数学上证明绝对没有漏项。</p>
+<h2 id="_3">近半年分类总览</h2>
+<p>这里把正文中的 51 个分析入口按“主要解决机制”分类。分类是互斥的主类，论文可能同时具有其他标签；第 50、51 条是边界综合项，不应当再当作新的单篇论文计数。</p>
+<table>
+<thead>
+<tr>
+<th>类别</th>
+<th>核心问题</th>
+<th>条目</th>
+<th>代表机制</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A. 问题级预算路由与自适应思考</td>
+<td>每道题应该思考多久、采样几次</td>
+<td>3, 18, 22, 29, 32, 40, 44</td>
+<td>难度/置信度路由、NoThink/Short/Long、剩余收益估计、controller</td>
+</tr>
+<tr>
+<td>B. 轨迹级早停与最优停止</td>
+<td>什么时候继续推理的边际收益已经低于成本</td>
+<td>4, 6, 8, 14, 21, 25, 27, 33, 34, 39</td>
+<td>答案稳定、语义冗余、attention state、MSC、optimal stopping</td>
+</tr>
+<tr>
+<td>C. 训练期长度/内容压缩与 credit assignment</td>
+<td>如何让 RL 不奖励答案后的废推理</td>
+<td>1, 9, 10, 12, 13, 20, 28, 31, 42</td>
+<td>短正确分布、动态目标长度、posterior distillation、分段 credit、树式偏好数据</td>
+</tr>
+<tr>
+<td>D. 显式 CoT 到 latent/abstract/function 表示</td>
+<td>用更少表面 token 保留中间计算</td>
+<td>7, 15, 16, 19, 26</td>
+<td>abstract token、选择性 latent span、functional token、几何/连续 latent、GFlowNet</td>
+</tr>
+<tr>
+<td>E. token/KV/量化系统级效率</td>
+<td>减少缓存、量化和解码带来的隐性成本</td>
+<td>17, 24, 30, 36, 48, 49</td>
+<td>KV budget、core/scratch consolidation、token inflation、量化模型 token penalty</td>
+</tr>
+<tr>
+<td>F. 冗余机制诊断、评测与反例</td>
+<td>找出何时“长”有害，以及如何公平测成本</td>
+<td>2, 11, 23, 35, 37, 43, 45, 51</td>
+<td>倒 U 曲线、共享预算、TES、entropy 反例、restart counterfactual</td>
+</tr>
+<tr>
+<td>G. 多 rollout / 搜索级剪枝与记忆复用</td>
+<td>不必让每条候选都完整走完</td>
+<td>38, 41, 46, 47</td>
+<td>hesitation marker pruning、reasoning memory、HAR state、token value</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_4">分类后的关键判断</h3>
+<ul>
+<li><strong>最直接改善数学 CoT 冗长的主线</strong>是 B+C：B 在推理时截断，C 在训练时改变策略；二者可以串联，但不能把同一段节省重复计算。</li>
+<li><strong>最可能形成下一代模型架构的主线</strong>是 D：latent/abstract 表示把成本从“输出多少字”转为“隐藏状态做多少次更新”，但可审计性和错误定位明显变差。</li>
+<li><strong>最容易被误判为已经解决冗长的主线</strong>是 E：KV 压缩和低比特量化减少内存/单 token 成本，却可能诱发更长的 CoT；必须同时报告生成长度和端到端 latency。</li>
+<li><strong>最适合建立统一实验协议的主线</strong>是 F：这些工作说明平均 token、最终准确率和单题预算都不足以描述实际部署的效率。</li>
+<li><strong>推荐的组合基线</strong>：先用 A 分配题级预算，再用 B 做在线停止，训练阶段用 C 的正确性优先 credit，系统层用 E 记录 KV/量化副作用；D 作为需要重新验证忠实性的独立架构路线。</li>
+</ul>
+<h2 id="2026-04-102026-10-10">近半年逐篇分析（2026-04-10—2026-10-10）</h2>
+<p>以下每条都按“方法—动机/目标—缺陷与新问题—结论”写。数字是论文自报结果，尚未做统一硬件复现实验。</p>
+<h3 id="1-stack-think-less-know-morearxiv2604091502026-04-10">1. STACK — Think Less, Know More（arXiv:2604.09150，2026-04-10）</h3>
+<p><strong>方法。</strong> STACK 对每个 reasoning state 做 step-wise 压缩：在线构造 long/short 对比样本；状态不确定或有 reasoning bias 时调用检索知识指导压缩，状态已经正确但过长时用 self-prompted compression；再以答案收敛作为早停信号。训练将 PPO 与 DPO 的 reward difference 结合，让策略学习“按状态选压缩器”。可抽象为 (a_t\in{\text{retrieve-compress},\text{self-compress},\text{continue}})，最大化 (R=A-\lambda L)。</p>
+<p><strong>动机/目标。</strong> 统一压缩把关键自纠错步骤和重复核验一视同仁；STACK 假设冗余来源随推理阶段变化。作者在三个数学基准报告平均长度降 59.9%、准确率升 4.8 个百分点。</p>
+<p><strong>缺陷/新问题。</strong> 在线对比采样和检索带来训练开销；检索错误会把偏置写入压缩轨迹，频繁检索还会增大上下文、稀释注意力。它依赖可验证答案和文本知识，开放题、工具/多模态场景的“状态标签”并不可靠；PPO+DPO 的两个信号可能互相争夺梯度。新问题是：压缩器学到的是通用冗余还是某个 benchmark 的检索模板？</p>
+<h3 id="2-when-more-thinking-hurts2604107392026-04-12">2. When More Thinking Hurts（2604.10739，2026-04-12）</h3>
+<p><strong>方法。</strong> 这是诊断和成本评测框架而非训练器：测 (\Delta A/\Delta L) 随预算的边际收益，记录“先得到正确答案、随后又放弃”的 harmful overthinking，并按难度估计每题最优思考长度。停止中等预算即可维持准确率。</p>
+<p><strong>动机/目标。</strong> 反驳“更多 token 单调更好”的默认假设，为动态停止提供曲线证据。</p>
+<p><strong>缺陷/新问题。</strong> 诊断依赖可强制截断和可解析答案；边际收益会随解码温度、模型版本、答案抽取器改变。它告诉我们哪里该停，却没有可部署的 stopping policy；如果直接把观察到的最优长度硬编码，会在分布外题目上欠思考。</p>
+<h3 id="3-adacompute2604148532026-04-16">3. AdaCompute（2604.14853，2026-04-16）</h3>
+<p><strong>方法。</strong> 将问题级分配写为约束优化：(\max \sum_i A_i(a_i)) s.t. (rac1n\sum_i C_i(a_i)\le B)。Lagrangian (A_i(a)-\eta C_i(a)) 使每题有 oracle action，利用成本关于 (\eta) 的单调性二分精确命中预算；再用轻量分类器从便宜特征预测 oracle action（SOLVE-THEN-LEARN）。</p>
+<p><strong>动机/目标。</strong> uniform rollout 把预算浪费在简单题、不给难题足够计算。MATH/GSM8K 报告相同预算下最高约 12.8% 相对准确率提升，模仿准确率超过 91%。</p>
+<p><strong>缺陷/新问题。</strong> oracle 需要先为每题跑多种动作，离线成本高；分类器误差在 action gap 大的题上会放大 regret。平均预算约束可能牺牲尾部难题或高价值题，且训练分布固定，不能处理题目价值不同的在线队列。</p>
+<h3 id="4-trace2604173042026-04-19">4. TRACE（2604.17304，2026-04-19）</h3>
+<p><strong>方法。</strong> 训练-free 地聚合最近多个步骤的答案一致性与置信度轨迹：不是看单点 (p_t)，而是看窗口内的持久性/趋势，满足双信号阈值才停止。报告 token 降 25–30%，准确率损失 1–2%。</p>
+<p><strong>动机/目标。</strong> 单步 confidence 在多步自纠错中会抖动；时间聚合更接近“已经收敛”。</p>
+<p><strong>缺陷/新问题。</strong> 一致的错误答案会触发过早停止，难题的正确答案可能在短暂低置信后出现；窗口大小和阈值对模型/温度敏感。它只观察答案分布，无法判断证明结构是否完整，可能留下“答案对但过程断裂”的前缀。</p>
+<h3 id="5-crisp2604172972026-04-19">5. CRISP（2604.17297，2026-04-19）</h3>
+<p><strong>方法。</strong> 发现 <code>&lt;/think&gt;</code> 的 attention pattern 是信息锚点，用其对原子操作进行 saliency pruning，构造模型自身的压缩目标，再蒸馏成短 CoT。核心假设是终止 token 的反向注意力能分出必要步骤与冗余。</p>
+<p><strong>动机/目标。</strong> 外部 compressor 不懂源模型内部动力学，会误删自纠错；CRISP 报告 50–60% token reduction 且准确率基本不变。</p>
+<p><strong>缺陷/新问题。</strong> attention 是相关性而非因果重要性；换 tokenizer、没有显式 <code>&lt;/think&gt;</code> 的模型或开放题时锚点失效。数据构造仍需迭代搜索，离线成本把推理节省转移到训练；主要在结构化数学上验证，可能培养“看起来连贯但缺少隐含条件”的短链。</p>
+<h3 id="6-traces2604210572026-04-22">6. TRACES（2604.21057，2026-04-22）</h3>
+<p><strong>方法。</strong> 实时给推理段落打行为标签（探索、验证、重复核验等），从标签转移模式学习可解释 early-stop 规则。核心观察是模型得到正确答案后会从有生产性的行为转向过度验证；MATH500/GSM8K/AIME/MMLU/GPQA 报告 20–50% token reduction。</p>
+<p><strong>动机/目标。</strong> 只看长度或最终 confidence 无法知道某一步的功能；step type 提供可解释信号。</p>
+<p><strong>缺陷/新问题。</strong> 在线标签器本身消耗计算且可能误读新颖的自纠错；困难题需要保守阈值，收益不稳定。标签是表面语言行为，模型可学会规避“重复”词而保留语义冗余，产生 reward hacking。</p>
+<h3 id="7-abstract-cot2604227092026-04-24">7. Abstract CoT（2604.22709，2026-04-24）</h3>
+<p><strong>方法。</strong> 用保留词表中的离散 abstract tokens 代替自然语言 CoT。先把 verbal CoT mask 成 bottleneck 做 SFT，再自蒸馏 prompt→abstract code，最后在 codebook 约束下 RL。短 token 序列承载推理状态，报告最多 11.6× 更少 reasoning tokens。</p>
+<p><strong>动机/目标。</strong> 连续 latent 方法效果落后于 verbal CoT；离散 code 兼顾可训练性和短序列。</p>
+<p><strong>缺陷/新问题。</strong> abstract token 不可读、难监控，错误定位和过程监督更难；codebook 与 backbone/tokenizer 强耦合。短序列减少解码步却可能增加每步状态复杂度，且训练阶段仍需长 CoT。它把“冗长文本”换成“不可解释内部状态”，会削弱数学证明的可审计性。</p>
+<h3 id="8-large-language-models-decide-early-and-explain-later2604222662026-04-24">8. Large Language Models Decide Early and Explain Later（2604.22266，2026-04-24）</h3>
+<p><strong>方法。</strong> 对每个 partial prefix 强制 answer completion，追踪答案何时最后一次改变；探针式停止在答案稳定后终止。Qwen3-4B 中只有约 32% query 会改变最终预测，最后一次切换后平均还生成 760 token；简单启发式可省约 500 token、准确率下降约 2%。</p>
+<p><strong>动机/目标。</strong> 区分“决定答案”和“事后解释”；后者是低收益延迟。</p>
+<p><strong>缺陷/新问题。</strong> 中间答案可能只是猜测，强制补全本身会改变 hidden state；答案稳定不等于证明稳定。对多答案、程序执行和需要最后一步计算的题，探针会把未完成的推理当作 post-decision explanation。</p>
+<h3 id="9-icr2605073162026-05-08">9. ICR（2605.07316，2026-05-08）</h3>
+<p><strong>方法。</strong> 观察 rollout group 中 length–accuracy correlation：负相关代表 overthinking，正相关代表 underthinking。取组内最短正确样本形成“虚拟短分布”，在 on-policy 目标中正则策略靠近它，而不是直接加 length penalty 或硬截断。</p>
+<p><strong>动机/目标。</strong> 静态长度惩罚会把模型从过思考推到欠思考；短而正确的样本已自然存在于 rollout 中。</p>
+<p><strong>缺陷/新问题。</strong> 需要组内出现正确短样本；早期/难题可能没有，信号稀疏。ICR 是软约束，不能给严格 latency SLA；相关性定义会被题目混合、temperature 和 group size 扭曲。未来需解释模型容量、难度和 rollout 多样性如何共同决定 Pareto 前沿。</p>
+<h3 id="10-expthink2605075012026-05-08">10. ExpThink（2605.07501，2026-05-08）</h3>
+<p><strong>方法。</strong> 经验缓冲区记录每题迄今最短正确解；三档 reward：短且正确满分、长但正确折扣、错误零分。阈值随能力提升自动收紧；用 correct-count 而非标准差归一化 advantage，让难题保留准确率梯度、简单题强化简洁。</p>
+<p><strong>动机/目标。</strong> 固定长度权重假设能力不变，无法反映同一题在训练后变容易；报告最多 77% 长度下降且准确率提升。</p>
+<p><strong>缺陷/新问题。</strong> 依赖可靠答案 verifier 和数学数据；短样本的偶然捷径会被记忆并放大。阈值/折扣仍是经验超参，experience buffer 可能偏向早期发现的模板，阻碍探索。</p>
+<h3 id="11-mpd2605087762026-05-09">11. MPD（2605.08776，2026-05-09）</h3>
+<p><strong>方法。</strong> 学生先采样 verbose trajectory，教师在同一题上重写为 concise trace，再对压缩轨迹做 KL 对齐；兼顾 on-policy 探索和 teacher compression，避免纯 off-policy 分布偏移。Qwen3-1.7B 最多省 27.1% token。</p>
+<p><strong>动机/目标。</strong> 大模型教师通常比小模型更会直接作答；把“短行为”迁移给部署友好的小模型。</p>
+<p><strong>缺陷/新问题。</strong> 论文明确不显式优化 correctness，错误 student trace 可能被教师压缩后学习；教师改写风格成为单点偏差。教师推理/重写成本可能超过学生节省，且 teacher/student tokenizer、能力差距会造成语义错配。</p>
+<h3 id="12-lead2605098062026-05-10">12. LEAD（2605.09806，2026-05-10）</h3>
+<p><strong>方法。</strong> 用 Potential-Scaled Instability 在线校准 correctness–efficiency 权重；从模型自己的正确 rollout 估计每题 target length，并用对称 reward 同时惩罚过思考与过压缩。</p>
+<p><strong>动机/目标。</strong> 静态 reward 权重在 RL 过程中不适配，global length 不反映每题预算。论文报告五个数学基准上较高 accuracy-efficiency score。</p>
+<p><strong>缺陷/新问题。</strong> target length 由当前模型产生，容易自我确认和累积偏差；instability 的尺度跨题、跨模型不稳定。对罕见难题，最短正确 rollout 可能不存在，反而诱导 underthinking。</p>
+<h3 id="13-vpg-ea2605110192026-05-10">13. VPG-EA（2605.11019，2026-05-10）</h3>
+<p><strong>方法。</strong> 将高效推理视为变分推断：参考答案条件下的 posterior 比 prior 更容易采到高效正确路径；共享参数的 dual-stream 同时建模 posterior/prior，用 cross-view 过滤伪高效路径，再做 variational distillation。效率感知 ELBO 近似 (\mathbb E_q[\log p(y|x,z)]-eta KL(q||p)-\lambda L(z))。</p>
+<p><strong>动机/目标。</strong> 复杂 reward 令高质量短轨迹稀疏，prior exploration 采样瓶颈；posterior 提供密集方向。</p>
+<p><strong>缺陷/新问题。</strong> 推理时不可用的 answer-conditioned posterior 依赖高质量 reference；cross-view filter 错误会把捷径当高效。双流共享参数仍增加训练显存，ELBO 的 KL/长度权重改变后可能牺牲探索多样性。</p>
+<h3 id="14-puma2605176722026-05-17">14. PUMA（2605.17672，2026-05-17）</h3>
+<p><strong>方法。</strong> 轻量 redundancy detector 判断连续步骤是否只是重述已知结论，再用 answer-level verifier 确认安全后退出；同时保留语义完整 prefix。五个 LRM/五个基准平均 token 减 26.2%。</p>
+<p><strong>动机/目标。</strong> confidence/答案一致性只说明 answer readiness，不说明 reasoning convergence；PUMA 增加语义新颖度信号。</p>
+<p><strong>缺陷/新问题。</strong> “新颖”与“必要”不是同义：最后一次关键代数变形可能与前句相似。detector 的训练分布和 verifier 的错误会叠加；对长程序、工具调用和形式证明，语义相似可能正是保持不变量所必需。</p>
+<h3 id="15-slt2605257452026-05-25">15. SLT（2605.25745，2026-05-25）</h3>
+<p><strong>方法。</strong> 轻量 decoder 预测即将到来的短 span，confidence gate 决定最长可压缩 span；可靠的冗余 span 编成 latent representation，精度关键 span 保留显式 CoT。三阶段训练：span latent compression、可靠性预测、trajectory-level RL。报告链长减 58.4%，相对显式 CoT 准确率损失约 2.8%。</p>
+<p><strong>动机/目标。</strong> 均匀 latent compression 会压掉临界中间步骤；选择性混合显式/潜在表示。</p>
+<p><strong>缺陷/新问题。</strong> 预测器的 confidence 可能校准错误；latent span 不可审计，压缩边界错误会污染后续状态。三阶段流水线复杂，部署需支持 latent token 与显式 token 切换。</p>
+<h3 id="16-cirf2605282922026-05-27">16. CIRF（2605.28292，2026-05-27）</h3>
+<p><strong>方法。</strong> 把显式 CoT 切成语义单元，为每单元分配可复用 functional token，模型自回归生成 function tokens 及可选结果，再输出答案。功能 token 既是离散 latent 状态又保留单元边界，支持并行训练和自适应步数。</p>
+<p><strong>动机/目标。</strong> 纯隐式 CoT 缺乏 rationale 对齐与复杂度适应；功能单元降低语言表面开销。</p>
+<p><strong>缺陷/新问题。</strong> 单元切分错误会使一个 token 承载多个逻辑操作；功能词表跨任务迁移性未知。所谓“并行训练”不一定降低自回归推理步数，结果 token 的可选生成会引入新的停止策略。</p>
+<h3 id="17-quantized-reasoning-models-think-they-need-to-think-longer2606002062026-05-29">17. Quantized Reasoning Models Think They Need to Think Longer（2606.00206，2026-05-29）</h3>
+<p><strong>方法/发现。</strong> PTQ 后最多 52% 失败样本曾在中间步骤得到正确答案，却继续分支并放弃它；高 quantized/full-precision KL 与高 next-token entropy 对齐。论文主张量化不仅降精度，还改变“承诺”行为。</p>
+<p><strong>动机/目标。</strong> 解释低比特推理的隐性 token 成本，而不是只看每 token 延迟。</p>
+<p><strong>缺陷/新问题。</strong> 主要是诊断，未给出通用修复器；KL 阈值依赖量化方案。若简单强制保留早期答案，会抑制必要的自纠错；量化与模型架构、校准集耦合，不能直接泛化所有 PTQ。</p>
+<h3 id="18-hab-thinking-economically2606011682026-05-31">18. HAB / Thinking Economically（2606.01168，2026-05-31）</h3>
+<p><strong>方法。</strong> Hierarchical Adaptive Budgeter 做 coarse-to-fine 分配：问题级预测 reasoning depth，step 级从 PPL 比较学习 token budget signal，并以 Fisher 信息剪枝提供训练指导；优化局部 Pareto 质量—成本。</p>
+<p><strong>动机/目标。</strong> 复杂度既跨问题异质，也在单题内部异质；uniform compression 会在简单步浪费、在关键步误删。</p>
+<p><strong>缺陷/新问题。</strong> PPL 是语言可预测性，不等于数学信息量；Fisher 近似对参数化敏感。两层控制器增加训练/推理开销，层级误差会传播（问题级错判时 step 级再精细也无济于事）。</p>
+<h3 id="19-glr2606022482026-06-01">19. GLR（2606.02248，2026-06-01）</h3>
+<p><strong>方法。</strong> 把 latent reasoning 视作预训练 embedding 空间的几何路径近似：transition head 预测方向更新，文字 CoT 作为 anchor，允许连续偏离离散 token。连续若干 latent steps 后再生成答案，Qwen3 数学实验显示无需显式 length objective 也会变短。</p>
+<p><strong>动机/目标。</strong> 离散文字每一步都付出 token/softmax 成本，并迫使模型过早提交具体词；连续路径保留计算而省表面解码。</p>
+<p><strong>缺陷/新问题。</strong> embedding 欧氏几何未必对应逻辑距离；路径漂移会导致 latent collapse 或不可解释错误。latent step 仍需 forward pass，token 减少不等于 FLOPs 同比例减少；从 CoT anchor 学到的是已有文字策略，可能限制真正新推理。</p>
+<h3 id="20-hmpo2606019342026-06-01">20. HMPO（2606.01934，2026-06-01）</h3>
+<p><strong>方法。</strong> 单阶段 RL：用成功 rollout 长度的 median 自适应预算；cosine-decay token reward 平滑惩罚；乘法 reward 令 correctness 严格优先于长度，避免“空答案 reward hacking”。数学训练跨 9B–122B，报告 19–46% token compression。</p>
+<p><strong>动机/目标。</strong> 手工预算、多阶段训练和线性 length penalty 不稳且难扩展。</p>
+<p><strong>缺陷/新问题。</strong> median 可能掩盖双峰长度分布（简单题/难题混在一起）；乘法 reward 在正确率接近零时几乎没有压缩梯度。数学 verifier 的可得性限制跨到开放科学和主观任务。</p>
+<h3 id="21-harmful-overthinking-2606028352026-06-01">21. harmful overthinking 评测（2606.02835，2026-06-01）</h3>
+<p><strong>方法。</strong> 定义 first-correct prefix 的 minimum reasoning budget，区分 harmless verbose 与继续推理后答案被破坏的 harmful overthink；prefix-level trajectory evaluation 显示首次正确停止最多提升 21%，早停可省约 50%。</p>
+<p><strong>动机/目标。</strong> “长但正确”和“长导致错误”需要分开，否则只优化平均长度会误诊。</p>
+<p><strong>缺陷/新问题。</strong> first-correct 依赖可抽取/可验证答案，数学证明未必在首次可解析答案时完成；多模态起点和 benchmark 选择可能高估早停收益。它给出上限式 oracle，尚未解决在线如何知道 prefix 已正确。</p>
+<h3 id="22-acts2606039652026-06-02">22. ACTS（2606.03965，2026-06-02）</h3>
+<p><strong>方法。</strong> 把 steering 设为 MDP：controller 观察 trace 和剩余预算，输出 reasoning strategy + steering phrase，引导冻结 reasoner 下一步；用合成多预算轨迹初始化，再用 budget-conditioned RL。</p>
+<p><strong>动机/目标。</strong> 早停/压缩只控制“多久”，不控制“怎么想”；在同一预算下切换探索、核验、总结策略。</p>
+<p><strong>缺陷/新问题。</strong> controller 的 phrase 会改变 reasoner 分布，带来 prompt-induced behavior；两个 agent 的推理开销可能抵消省下的 token。策略空间和预算条件多，训练稳定性与可解释性较差。</p>
+<h3 id="23-thinkbooster2606069152026-06-05">23. THINKBOOSTER（2606.06915，2026-06-05）</h3>
+<p><strong>方法。</strong> 统一库、benchmark、OpenAI-compatible proxy 和 trajectory debugger，把 self-consistency、beam/tree search、verifier/scorer 放到同一 quality-cost 协议比较；不是新压缩模型，而是可部署的 TTC 选择层。</p>
+<p><strong>动机/目标。</strong> 现有 test-time scaling 实验协议碎片化，无法公平比较“准确率换了多少计算”。</p>
+<p><strong>缺陷/新问题。</strong> 基准和 proxy 解决工程可见性，不自动学习最佳停止；不同硬件/缓存/批处理的成本不可由 token 数代表。若 benchmark 的 scorer 偏好某种轨迹，结论会反过来指导错误的系统选择。</p>
+<h3 id="24-reasonalloc2606111642026-06-09">24. ReasonAlloc（2606.11164，2026-06-09）</h3>
+<p><strong>方法。</strong> 训练-free KV budget allocation：离线 layer-wise “ReasoningWave”预分配，在线 head-wise 按 utility/redundancy 重分配，替换 uniform R-KV/SnapKV/Pyramid-RKV。</p>
+<p><strong>动机/目标。</strong> 长 CoT 的 KV cache 随 token 增长；prompt prefill 的静态分配不能描述 autoregressive reasoning 的逐步需求。</p>
+<p><strong>缺陷/新问题。</strong> cache 压缩减少内存不等于减少生成 token；错误 eviction 会破坏尚未显式表达的数学约束。ReasoningWave 可能随模型、层数、RoPE 和 batch size 改变；在线 head scoring 有额外 kernel/同步成本。</p>
+<h3 id="25-asag2606150702026-06-13">25. ASAG（2606.15070，2026-06-13）</h3>
+<p><strong>方法。</strong> 直接从 attention distribution 推断 reasoning state，训练-free 调整生成策略，Qwen3-8B 报告平均准确率 +3.2%、token 约 -40%。</p>
+<p><strong>动机/目标。</strong> 训练型早停贵，prompt/confidence 型方法不稳；attention 是现成内部信号。</p>
+<p><strong>缺陷/新问题。</strong> attention sink、层间重分配和头的语义差异使简单汇总不稳；attention 高不代表答案正确。跨模型需重新标定阈值，且改 decoding strategy 可能造成分布偏移。</p>
+<h3 id="26-ltf2606162222026-06-15">26. LTF（2606.16222，2026-06-15）</h3>
+<p><strong>方法。</strong> 用 continuous GFlowNet 采样 variable-length latent trajectories，目标是同时匹配答案质量和计算成本的 reward-induced posterior；Entropy-Weighted Subtrajectory Balance 提供中间稀疏奖励，reference prior 正则探索。报告相对 latent baseline 准确率 +9.5%、长度 -27.2%。</p>
+<p><strong>动机/目标。</strong> 现有 latent reasoning 只找单条 reward-max path，不会把不同正确率/成本的路径分配成后验。</p>
+<p><strong>缺陷/新问题。</strong> GFlowNet 训练复杂、稀疏答案监督困难；posterior reward 设计决定多样性，容易采到许多“便宜但相似”的路径。latent trajectory 难检查，数学错误可能被压缩成不可诊断的状态。</p>
+<h3 id="27-suco2606176872026-06-16">27. SuCo（2606.17687，2026-06-16）</h3>
+<p><strong>方法。</strong> 定义 Minimal Sufficient CoT（MSC）：能产生正确答案的最短 prefix。阶段一用问题自适应 sufficiency threshold 构造 MSC 数据做 MFT；阶段二用 complexity tracking 和同时惩罚 over/under-thinking 的 SAPO RL。</p>
+<p><strong>动机/目标。</strong> 固定 NoThink/Short/Long 档位粗糙；把“最短仍足够”作为可学习目标。</p>
+<p><strong>缺陷/新问题。</strong> MSC 标签依赖 verifier，且“答案正确”不代表推理过程充分/忠实；模型可能学会尽早输出答案再补解释。连续复杂度 tracker 的校准和训练开销尚未充分证明。</p>
+<h3 id="28-dre2606178902026-06-16">28. DRE（2606.17890，2026-06-16）</h3>
+<p><strong>方法。</strong> 将 overthinking 视为 GRPO credit-assignment 问题：找出已验证答案出现的 prefix，保留该 prefix，编辑后续思考，并在同一 rollout group 中偏好 edited trajectory，切断 sequence-level reward 对废续的正反馈。</p>
+<p><strong>动机/目标。</strong> vanilla GRPO 把得到答案和答案后的验证一起奖励，早期微小 overthink 会被放大成训练反馈环。</p>
+<p><strong>缺陷/新问题。</strong> answer emergence parser/verifier 可能误判，prefix 太早会删除必要自纠错；编辑模型引入 off-policy artifact。依赖可验证数学答案，开放题无法精确定位“答案已出现”。</p>
+<h3 id="29-adapt2606199192026-06-18">29. ADaPT（2606.19919，2026-06-18）</h3>
+<p><strong>方法。</strong> 增加 mode-selection token 控制 fast/slow process，只把 efficiency reward 施加在 mode token，不惩罚后续正确但很长的轨迹；推理时调 mode token 概率，连续移动 accuracy-efficiency Pareto frontier。</p>
+<p><strong>动机/目标。</strong> sequence-level length reward 将“必要长推理”错误当成坏样本；把路由决策与内容正确性解耦。</p>
+<p><strong>缺陷/新问题。</strong> mode token 是粗粒度的二元/多元选择，无法处理题中途难度变化；路由概率调节需要校准。fast/slow 两种分布可能共享表示导致模式塌缩，且额外 token 的收益依赖训练数据覆盖。</p>
+<h3 id="30-quantization-inflates-reasoning2606255192026-06-24">30. Quantization Inflates Reasoning（2606.25519，2026-06-24）</h3>
+<p><strong>方法。</strong> 提出 CoT Token Inflation Ratio：量化/全精度推理长度比，跨数学、代码、科学、工具任务测 INT4/INT3 的 token inflation，并分析语义重复与服务代价；提示和采样缓解有限。</p>
+<p><strong>动机/目标。</strong> 低比特每 token 更快，但如果多生成 30–50% token，总延迟/能耗可能不降。</p>
+<p><strong>缺陷/新问题。</strong> 主要是 measurement，不能告诉部署者该选哪个量化校准；token inflation 与 accuracy、batching、硬件 kernel 交织。只在输出层惩罚长度可能进一步放大量化错误。</p>
+<h3 id="31-dash2607004822026-07-01">31. DASH（2607.00482，2026-07-01）</h3>
+<p><strong>方法。</strong> 发现错误轨迹即使长度相同也有更多无生产性自反思；用中间 answer commitment 与 ground truth 比较作为便宜 proxy，按 segment 的 drift toward/away from correct answer 做 advantage shaping。</p>
+<p><strong>动机/目标。</strong> 冗余不是 token 数本身，而是“放弃已有答案、矛盾、hedging”等行为；逐步标注成本高，commitment 可替代。</p>
+<p><strong>缺陷/新问题。</strong> 训练时 ground truth 可用，部署时不可用；把 commitment 当正确性 proxy 会奖励过早自信。segment credit 可能抑制有益的反思，尤其在需要推翻初始直觉的难题上。</p>
+<h3 id="32-cat2607008622026-07-01">32. CAT（2607.00862，2026-07-01）</h3>
+<p><strong>方法。</strong> 将模型 intrinsic self-certainty 转为 preference optimization 的 confidence，置信高的样本压短，置信低的样本保留长思考，实现难度自适应。</p>
+<p><strong>动机/目标。</strong> uniform length reduction 在难题上伤害准确率；模型自身不确定性是无需额外 difficulty label 的路由信号。</p>
+<p><strong>缺陷/新问题。</strong> LRM 的 confidence 可能系统性过信，尤其量化、OOD 或错误但流畅的轨迹；偏好优化会把 calibration error 变成长度决策。简单题的高 confidence 也可能是 shortcut。</p>
+<h3 id="33-os-pruner2607110892026-07-13">33. OS-Pruner（2607.11089，2026-07-13）</h3>
+<p><strong>方法。</strong> 将每个 prefix 的继续/停止建模为 optimal stopping，学习显式 utility (U_i=P(\text{correct}|y_{\le i})-\lambda c_i)，而不是只对 answer correctness 做阈值分类；只微调小 policy head/末层，推理按 step boundary 调用。报告 20–60% generation reduction。</p>
+<p><strong>动机/目标。</strong> 固定预算、启发式过滤和 correctness threshold 会错过“当前答案错但继续能纠正”的状态；最优停止要比较继续的期望价值。</p>
+<p><strong>缺陷/新问题。</strong> 学到的 continuation value 受训练 horizon 和成本权重影响；policy head 误差在长链累积。论文主要是数学，&gt;20B 和代码/科学泛化未验证；停止后保留的 prefix 可能不可读。</p>
+<h3 id="34-token-budget-saturation2607214332026-07-23">34. Token-budget saturation（2607.21433，2026-07-23）</h3>
+<p><strong>方法。</strong> 在 GSM8K/MATH500/AIME 对 budget forcing 做曲线和机制分析：前两者约 256 thinking tokens 已达未截断 95% 准确率；AIME 出现双峰，一部分在 96 tokens 左右收敛且 96.5% 正确，另一部分到 10k 仍不收敛且仅 11.5%。</p>
+<p><strong>动机/目标。</strong> 说明平均难度不能决定预算，non-convergence 是可识别的失败模式。</p>
+<p><strong>缺陷/新问题。</strong> 研究主要单模型；“提前识别不收敛”仍未给出稳健在线特征。双峰可能来自 prompt、采样或 parser，不能直接推导统一动态预算。</p>
+<h3 id="35-demystifying-entropy-based-selection2607287072026-07-30">35. Demystifying Entropy-based Selection（2607.28707，2026-07-30）</h3>
+<p><strong>方法/结论。</strong> 复测低/高 entropy CoT step pruning，发现不优于随机；低 entropy token 在数学上看似有效主要因为数字 token 本来熵低且承载答案信息。激活 patch 实验表明信息分布在全链。</p>
+<p><strong>动机/目标。</strong> 纠正“entropy 就是重要性”的压缩假设。</p>
+<p><strong>缺陷/新问题。</strong> 它主要否定一种启发式，不提供新压缩器；激活 patch 的因果解释依赖模型/层。实际需要结构、语义和因果联合评分，而不是简单 entropy。</p>
+<h3 id="36-reco2608047712026-08-05">36. ReCo（2608.04771，2026-08-05）</h3>
+<p><strong>方法。</strong> process reward 驱动三件事：高 reward step 更激进地压 KV、低 reward step 少删；对 reflection token 做 reward-banded penalty；置信可靠时 early stop。联合考虑 cache 压缩可能诱发的“生成更多 token”。报告 token -37%至 -65%、latency 2.08–2.35×。</p>
+<p><strong>动机/目标。</strong> cache 压缩不仅删除上下文，还会改变后续生成；只看保留率会高估收益。</p>
+<p><strong>缺陷/新问题。</strong> process reward 估计器本身是额外模型，错误 reward 会同时误导 cache 和长度；高 reward 不一定代表未来不再需要上下文。KV 操作的真实 GPU kernel 成本可能与 token 指标不一致。</p>
+<h3 id="37-shared-budget-exam-study2608079682026-08-08">37. Shared-budget exam study（2608.07968，2026-08-08）</h3>
+<p><strong>方法/发现。</strong> 设计共享 token budget 的考试式评测，题目有不同难度和分值；模型多按出现顺序贪心，无法按价值/难度重新分配。显式 planning 只让预算更均匀，未实现 value-aware routing。</p>
+<p><strong>动机/目标。</strong> 单题最优长度不等于队列/考试总分最优；部署常受总延迟约束。</p>
+<p><strong>缺陷/新问题。</strong> 这是诊断基准，不是修复方法；分值设置会决定策略，且真实服务的到达顺序、截止期、并发不同。它提醒我们需要 knapsack/bandit 式调度，而不是只训练 per-query stopper。</p>
+<h3 id="38-funnel-of-thoughts2608150652026-08-15">38. Funnel of Thoughts（2608.15065，2026-08-15）</h3>
+<p><strong>方法。</strong> 多 rollout 中检测 “Wait/Actually/perhaps” 等 hesitation marker，提前剪掉低成功率、过度消耗 attention FLOPs 的轨迹，再投票；报告保持 32 路投票准确率、attention FLOPs 约减半。</p>
+<p><strong>动机/目标。</strong> self-consistency 的瓶颈是无效 rollout，不一定要缩短每条链。</p>
+<p><strong>缺陷/新问题。</strong> 词法 marker 是语言/模板依赖，可能把真正有益的自纠错误删；攻击者可改写 marker。对数学语言不同、非英语或没有显式 hesitation 的模型迁移性未知。</p>
+<h3 id="39-evoresearcher2608188842026-08-19">39. EvoResearcher（2608.18884，2026-08-19）</h3>
+<p><strong>方法。</strong> 冻结模型做 generate→self-critique→revise，直到 <code>CONFIRMED</code> 或深度上限；把 correctness、efficiency、reflection depth、tool diversity 写进 prompt-level meta-reward。GSM8K/MATH/BBH 报告 82–88% 样本可在等准确率下早停，约 2.1 generations/question。</p>
+<p><strong>动机/目标。</strong> 避免昂贵 GRPO，用训练-free 自验证获取 bounded reflection。</p>
+<p><strong>缺陷/新问题。</strong> critique 与 answer 同源，确认 sentinel 可能是“自我同意”；每轮 critique 本身要生成 token，未必比直接长 CoT 便宜。tool diversity/agent extension 没有在论文实验中验证。</p>
+<h3 id="40-learning-when-to-think2608202562026-08-20">40. Learning When to Think（2608.20256，2026-08-20）</h3>
+<p><strong>方法。</strong> GRPO 内学习首 token 路由 NoThink/Short/Long，配合 shaped reward 和硬 per-mode caps，1.5B MATH 模型平均长度 4796→2811（-41%），MATH500 准确率 0.782 vs 0.796，GSM8K 省约 76%。</p>
+<p><strong>动机/目标。</strong> 固定预算导致 easy overcompute、hard undercompute；无需单独 router。</p>
+<p><strong>缺陷/新问题。</strong> 三档离散路由不能中途增减预算；模式可能在别的模型/任务塌缩。首 token 决策没有看到解题过程，难题分类错后无法补救。</p>
+<h3 id="41-memory-augmented-compression2608212652026-08-21">41. Memory-Augmented Compression（2608.21265，2026-08-21）</h3>
+<p><strong>方法。</strong> 提出 Context–Generation Substitution Law：prefill 的可复用 reasoning memory 可以替代一部分 decode。把历史 trace 总结为模式、约束、关键操作，检索后作为 scaffold，补偿 Chain-of-Draft 压缩损失；报告 GSM8K/MATH/BBH/MMLU-Sci 相对 CoD 有 21.4/28.0/29.5/6.61 点提升，latency 1.14–1.49×。</p>
+<p><strong>动机/目标。</strong> 压短当前链会丢掉可复用中间知识；把成本从逐 token 生成移到一次性 prefill。</p>
+<p><strong>缺陷/新问题。</strong> memory retrieval 错配会把别题策略注入当前题，且 context 变长可能吞噬 KV/首 token 延迟；“prefill 更便宜”的假设依赖硬件和 batch。历史解法有隐私/污染和 benchmark leakage 风险。</p>
+<h3 id="42-chainprune2608218602026-08-22">42. ChainPrune（2608.21860，2026-08-22）</h3>
+<p><strong>方法。</strong> 将多条 self-generated reasoning path 合成树，按语义相似和 entropy 变化合并；用 token/step 效率与质量做 Pareto-dominant path selection，再用 DPO+SFT 学短而完整链。</p>
+<p><strong>动机/目标。</strong> 只惩罚 token 会产生 pseudo-conciseness：字数少了，重复逻辑还在；树结构可共享前缀并保留分支信息。</p>
+<p><strong>缺陷/新问题。</strong> 树合并的 cosine/entropy 阈值是启发式，错误合并会把不同证明分支混为一谈；DPO 的 log-prob 梯度纠缠可能同时降低 chosen/rejected，论文自己观察理想梯度条件罕见。离线多路径搜索昂贵。</p>
+<h3 id="43-token-economy-score2608262352026-08-26">43. Token Economy Score（2608.26235，2026-08-26）</h3>
+<p><strong>方法。</strong> 定义 TES = ((A_{reason}-A_{base})/(L_{reason}/L_{base}))，并辅以 Reasoning Cost Share、Deployment Cost Multiplier；151 次运行显示任务结构比名义难度更能预测 reasoning efficiency，高 effort 会边际递减甚至降准确率。</p>
+<p><strong>动机/目标。</strong> accuracy-only benchmark 不回答“额外 thinking 值不值”；为模型选择和部署提供经济指标。</p>
+<p><strong>缺陷/新问题。</strong> base model 配对、tokenizer、硬件价格会改变分母；线性 token multiplier 忽略 KV、并行采样和服务 batching。TES 是评测指标，不会自动降低冗余，且可能鼓励牺牲难题准确率换高分。</p>
+<h3 id="44-aera2608279642026-08-28">44. AERA（2608.27964，2026-08-28）</h3>
+<p><strong>方法。</strong> 不把当前 confidence 当作未来收益，而从 prefix 的 answer-distribution、时间、重解、语义和 compute 特征估计“剩余可恢复价值”，逐块 stop/allocate；未来 correctness 只用于离线监督。GSM8K 128 responses 的 93.01% 降到 92.61%，completion tokens 减 95.99%。</p>
+<p><strong>动机/目标。</strong> checkpoint correctness 非单调：证据变强后仍可能崩，变弱后也可能恢复。</p>
+<p><strong>缺陷/新问题。</strong> 95.99% 的极端节省需要强基线/增量设置，不能直接外推到单条长 CoT；离线 future-value 标签会产生 selection bias。控制器在新模型、不同温度和高难题上的 calibrated residual value 未知。</p>
+<h3 id="45-its-the-problem-not-the-path2609034362026-09-02">45. It's the Problem, Not the Path（2609.03436，2026-09-02）</h3>
+<p><strong>方法/发现。</strong> restart-controlled truncation：在相同总 token 预算下比较继续 prefix 与从头 restart，区分“prefix 压缩了计算”与“prefix 带来了新 reachability”；178 problem-model cells 仅 1 个真正 prefix-limited。</p>
+<p><strong>动机/目标。</strong> 反驳把早期 trace 的“突破点/命运”当作可预测内部信号；控制题目难度混淆。</p>
+<p><strong>缺陷/新问题。</strong> 小模型、89 MATH 样本限制外推；它是方法论诊断而非 stopper。结论意味着很多短化收益来自复用已有计算，不能据此断言 latent reasoning 能发现新解。</p>
+<h3 id="46-arsm2609328522026-09-26">46. ARSM（2609.32852，2026-09-26）</h3>
+<p><strong>方法。</strong> 面向长 horizon agent：把历史重组为 Hypothesis–Action–Result 微链，用 dynamic state machine 做层级 memory 原子操作，并在自回归生成中同时更新状态和执行动作。</p>
+<p><strong>动机/目标。</strong> agent context 持续增长，普通摘要丢结构关系，导致 attention collapse；结构化状态比纯文本总结更稳。</p>
+<p><strong>缺陷/新问题。</strong> 不是数学 CoT 专门方法，证据来自 Webshop/Multi-hop/SWE；HAR 抽象可能丢掉数学证明的细粒度条件。状态机错误会持久化污染未来决策，且训练-free 并不意味着无额外摘要 token。</p>
+<h3 id="47-tokenprobe2609339702026-09-27">47. TokenProbe（2609.33970，2026-09-27）</h3>
+<p><strong>方法。</strong> 用 normalized token log-prob 近似 token value，区分结构/决定性 core token 与低置信探索/填充 token；在 GRPO 中选择性压缩冗余 token。报告 token usage 约降 76%（按论文口径）并保持质量。</p>
+<p><strong>动机/目标。</strong> token 价值高度不均，长度惩罚把关键低概率自纠错一起杀掉。</p>
+<p><strong>缺陷/新问题。</strong> 置信与价值是相关而非因果；重复错误可能高概率，训练 regime 改变后 confidence–correctness 关系会反转。依赖生成策略和 logprob 可见性，需每个 checkpoint 重新验证，且过度保留高概率模板会降低探索。</p>
+<h3 id="48-ratio2609398012026-09-30">48. RATIO（2609.39801，2026-09-30）</h3>
+<p><strong>方法。</strong> 针对量化模型，QRBA 比较 full-precision 与 quantized 的行为差异找 model-specific overthinking tokens；TSPD 用 full-precision guidance 给每个 token 定制 penalty，无需再训练。报告准确率最多 +9.8 点、CoT 最多 -51.3%。</p>
+<p><strong>动机/目标。</strong> 固定 <code>Wait/Actually</code> marker 不适应不同量化模型；希望只惩罚量化诱发的特定 token。</p>
+<p><strong>缺陷/新问题。</strong> 需要同时运行 full-precision teacher，部署节省被 teacher 比较抵消；token discrepancy 不一定表示冗余，可能是量化模型真正需要的纠错。对没有 FP reference 的边缘部署不可用。</p>
+<h3 id="49-cask2604109002026-04-13">49. CASK（2604.10900，2026-04-13，邻接）</h3>
+<p><strong>方法。</strong> 把 reasoning KV 分成 protected core 与 mergeable scratch，核心保持、scratch 选择性 consolidation；prompt-heavy 时先 prefix eviction、再 decode consolidation。</p>
+<p><strong>动机/目标。</strong> 仅改 scorer 不会改变 keep-set；行为保持的结构合并比排名淘汰更适合长推理。</p>
+<p><strong>缺陷/新问题。</strong> core/scratch 的边界依赖任务和答案形成阶段；合并 scratch 可能破坏跨步引用。主要报告 KV continuation fidelity，不等于完整数学准确率和端到端成本。</p>
+<h3 id="50-reasonalloccask">50. ReasonAlloc/CASK 类系统工作的共同边界</h3>
+<p>二者都说明“缓存 token 数”与“推理 token 数”是耦合的：保留更多上下文可能减少重算，删得太多会诱发更长轨迹。部署时应报告 (\text{latency}=T_{prefill}+T_{decode}+T_{KV\ ops})，不能只报告 CoT 长度。它们是数学推理效率的系统层补充，而非替代语义压缩。</p>
+<h3 id="51-longcotthought-streams-token">51. 近半年邻接诊断：LongCoT、Thought Streams、共享预算与深思 token</h3>
+<p>LongCoT（2604.14140）用可验证的超长 horizon 基准测几十万 token 的失败；Thought Streams（2604.11177）显示大部分收益集中在前几百 token，并警告压缩步会产生 hallucination；Deep-Thinking Tokens（2602.13517，首发在近半年窗口内）以跨层预测修订比例而非 raw length 衡量 effort；这些工作没有直接压缩数学 CoT，但决定了 future stopper 应监测“真正计算量”而非表面 token。其共同缺陷是评测变量与内部思考并不等价，跨模型解释仍待验证。</p>
+<h2 id="2024-10-102026-04-09">两年窗口的完整候选清单（2024-10-10—2026-04-09）</h2>
+<p>下表是按标题直接命中长度/压缩/预算/早停/高效推理等词的去重清单；它包括核心方法、诊断/评测、综述和少量邻接工作。每篇标题和日期均可由 arXiv ID 复核，核心性请结合上面的纳入标准判断。</p>
+<table>
+<thead>
+<tr>
+<th>首发日期</th>
+<th>arXiv</th>
+<th>标题</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2024-10-10</td>
+<td><a href="http://arxiv.org/abs/2410.08048">2410.08048</a></td>
+<td>VerifierQ: Enhancing LLM Test Time Compute with Q-Learning-based Verifiers</td>
+</tr>
+<tr>
+<td>2024-10-13</td>
+<td><a href="http://arxiv.org/abs/2410.10020">2410.10020</a></td>
+<td>Adaptive Reasoning and Acting in Medical Language Agents</td>
+</tr>
+<tr>
+<td>2024-11-29</td>
+<td><a href="http://arxiv.org/abs/2411.19477">2411.19477</a></td>
+<td>Provable Scaling Laws for the Test-Time Compute of Large Language Models</td>
+</tr>
+<tr>
+<td>2024-12-12</td>
+<td><a href="http://arxiv.org/abs/2412.09078">2412.09078</a></td>
+<td>Forest-of-Thought: Scaling Test-Time Compute for Enhancing LLM Reasoning</td>
+</tr>
+<tr>
+<td>2024-12-17</td>
+<td><a href="http://arxiv.org/abs/2412.13171">2412.13171</a></td>
+<td>Compressed Chain of Thought: Efficient Reasoning Through Dense Representations</td>
+</tr>
+<tr>
+<td>2024-12-24</td>
+<td><a href="http://arxiv.org/abs/2412.18547">2412.18547</a></td>
+<td>Token-Budget-Aware LLM Reasoning</td>
+</tr>
+<tr>
+<td>2024-12-27</td>
+<td><a href="http://arxiv.org/abs/2412.19707">2412.19707</a></td>
+<td>Toward Adaptive Reasoning in Large Language Models with Thought Rollback</td>
+</tr>
+<tr>
+<td>2024-12-30</td>
+<td><a href="http://arxiv.org/abs/2412.21187">2412.21187</a></td>
+<td>Do NOT Think That Much for 2+3=? On the Overthinking of o1-Like LLMs</td>
+</tr>
+<tr>
+<td>2025-02-04</td>
+<td><a href="https://arxiv.org/abs/2502.02542">2502.02542</a></td>
+<td>OverThink: Slowdown Attacks on Reasoning LLMs</td>
+</tr>
+<tr>
+<td>2025-02-12</td>
+<td><a href="http://arxiv.org/abs/2502.08235">2502.08235</a></td>
+<td>The Danger of Overthinking: Examining the Reasoning-Action Dilemma in Agentic Tasks</td>
+</tr>
+<tr>
+<td>2025-02-17</td>
+<td><a href="http://arxiv.org/abs/2502.12022">2502.12022</a></td>
+<td>Teaching LLMs According to Their Aptitude: Adaptive Reasoning for Mathematical Problem Solving</td>
+</tr>
+<tr>
+<td>2025-02-17</td>
+<td><a href="http://arxiv.org/abs/2502.12067">2502.12067</a></td>
+<td>TokenSkip: Controllable Chain-of-Thought Compression in LLMs</td>
+</tr>
+<tr>
+<td>2025-03-12</td>
+<td><a href="http://arxiv.org/abs/2506.10987">2506.10987</a></td>
+<td>Chain of Draft for Software Engineering: Challenges in Applying Concise Reasoning to Code Tasks</td>
+</tr>
+<tr>
+<td>2025-03-27</td>
+<td><a href="http://arxiv.org/abs/2503.21614">2503.21614</a></td>
+<td>A Survey of Efficient Reasoning for Large Reasoning Models: Language, Multimodality, and Beyond</td>
+</tr>
+<tr>
+<td>2025-03-31</td>
+<td><a href="https://arxiv.org/abs/2503.24377">2503.24377</a></td>
+<td>Harnessing the Reasoning Economy: A Survey of Efficient Reasoning for Large Language Models</td>
+</tr>
+<tr>
+<td>2025-04-07</td>
+<td><a href="http://arxiv.org/abs/2504.05185">2504.05185</a></td>
+<td>Concise Reasoning via Reinforcement Learning</td>
+</tr>
+<tr>
+<td>2025-04-09</td>
+<td><a href="http://arxiv.org/abs/2504.06514">2504.06514</a></td>
+<td>Missing Premise exacerbates Overthinking: Are Reasoning Models losing Critical Thinking Skill?</td>
+</tr>
+<tr>
+<td>2025-04-14</td>
+<td><a href="http://arxiv.org/abs/2504.10449">2504.10449</a></td>
+<td>M1: Towards Scalable Test-Time Compute with Mamba Reasoning Models</td>
+</tr>
+<tr>
+<td>2025-04-15</td>
+<td><a href="http://arxiv.org/abs/2504.10903">2504.10903</a></td>
+<td>Efficient Reasoning Models: A Survey</td>
+</tr>
+<tr>
+<td>2025-04-22</td>
+<td><a href="http://arxiv.org/abs/2504.15895">2504.15895</a></td>
+<td>Dynamic Early Exit in Reasoning Models</td>
+</tr>
+<tr>
+<td>2025-04-29</td>
+<td><a href="http://arxiv.org/abs/2504.20493">2504.20493</a></td>
+<td>Token-Efficient Prompt Injection Attack: Provoking Cessation in LLM Reasoning via Adaptive Token Compression</td>
+</tr>
+<tr>
+<td>2025-05-06</td>
+<td><a href="http://arxiv.org/abs/2505.03469">2505.03469</a></td>
+<td>Long-Short Chain-of-Thought Mixture Supervised Fine-Tuning Eliciting Efficient Reasoning in Large Language Models</td>
+</tr>
+<tr>
+<td>2025-05-08</td>
+<td><a href="http://arxiv.org/abs/2505.04881">2505.04881</a></td>
+<td>ConCISE: Confidence-guided Compression in Step-by-step Efficient Reasoning</td>
+</tr>
+<tr>
+<td>2025-05-19</td>
+<td><a href="http://arxiv.org/abs/2505.13326">2505.13326</a></td>
+<td>Thinking Short and Right Over Thinking Long: Serving LLM Reasoning Efficiently and Accurately</td>
+</tr>
+<tr>
+<td>2025-05-20</td>
+<td><a href="http://arxiv.org/abs/2505.14582">2505.14582</a></td>
+<td>Can Pruning Improve Reasoning? Revisiting Long-CoT Compression with Capability in Mind for Better Reasoning</td>
+</tr>
+<tr>
+<td>2025-05-20</td>
+<td><a href="http://arxiv.org/abs/2505.14733">2505.14733</a></td>
+<td>The Energy Cost of Reasoning: Analyzing Energy Usage in LLMs with Test-time Compute</td>
+</tr>
+<tr>
+<td>2025-05-22</td>
+<td><a href="http://arxiv.org/abs/2505.16122">2505.16122</a></td>
+<td>Plan and Budget: Effective and Efficient Test-Time Scaling on Reasoning Large Language Models</td>
+</tr>
+<tr>
+<td>2025-05-22</td>
+<td><a href="http://arxiv.org/abs/2505.17312">2505.17312</a></td>
+<td>AdaReasoner: Adaptive Reasoning Enables More Flexible Thinking in Large Language Models</td>
+</tr>
+<tr>
+<td>2025-05-22</td>
+<td><a href="http://arxiv.org/abs/2505.16886">2505.16886</a></td>
+<td>Don't "Overthink" Passage Reranking: Is Reasoning Truly Necessary?</td>
+</tr>
+<tr>
+<td>2025-05-26</td>
+<td><a href="http://arxiv.org/abs/2505.19716">2505.19716</a></td>
+<td>Concise Reasoning, Big Gains: Pruning Long Reasoning Trace with Difficulty-Aware Prompting</td>
+</tr>
+<tr>
+<td>2025-05-26</td>
+<td><a href="http://arxiv.org/abs/2505.19756">2505.19756</a></td>
+<td>Efficient Reasoning via Chain of Unconscious Thought</td>
+</tr>
+<tr>
+<td>2025-05-27</td>
+<td><a href="http://arxiv.org/abs/2505.21178">2505.21178</a></td>
+<td>Walk Before You Run! Concise LLM Reasoning via Reinforcement Learning</td>
+</tr>
+<tr>
+<td>2025-05-28</td>
+<td><a href="http://arxiv.org/abs/2505.22017">2505.22017</a></td>
+<td>The Price of a Second Thought: On the Evaluation of Reasoning Efficiency in Large Language Models</td>
+</tr>
+<tr>
+<td>2025-05-29</td>
+<td><a href="http://arxiv.org/abs/2505.23480">2505.23480</a></td>
+<td>Revisiting Overthinking in Long Chain-of-Thought from the Perspective of Self-Doubt</td>
+</tr>
+<tr>
+<td>2025-05-29</td>
+<td><a href="http://arxiv.org/abs/2505.23059">2505.23059</a></td>
+<td>From Token to Action: State Machine Reasoning to Mitigate Overthinking in Information Retrieval</td>
+</tr>
+<tr>
+<td>2025-06-03</td>
+<td><a href="http://arxiv.org/abs/2506.02536">2506.02536</a></td>
+<td>Answer Convergence as a Signal for Early Stopping in Reasoning</td>
+</tr>
+<tr>
+<td>2025-06-04</td>
+<td><a href="http://arxiv.org/abs/2506.04301">2506.04301</a></td>
+<td>The Cost of Dynamic Reasoning: Demystifying AI Agents and Test-Time Scaling from an AI Infrastructure Perspective</td>
+</tr>
+<tr>
+<td>2025-06-05</td>
+<td><a href="http://arxiv.org/abs/2506.04611">2506.04611</a></td>
+<td>Revisiting Test-Time Scaling: A Survey and a Diversity-Aware Method for Efficient Reasoning</td>
+</tr>
+<tr>
+<td>2025-06-05</td>
+<td><a href="http://arxiv.org/abs/2506.04574">2506.04574</a></td>
+<td>Reasoning or Overthinking: Evaluating Large Language Models on Financial Sentiment Analysis</td>
+</tr>
+<tr>
+<td>2025-06-15</td>
+<td><a href="https://arxiv.org/abs/2506.12721">2506.12721</a></td>
+<td>Strategic Scaling of Test-Time Compute: A Bandit Learning Approach</td>
+</tr>
+<tr>
+<td>2025-06-16</td>
+<td><a href="http://arxiv.org/abs/2506.13585">2506.13585</a></td>
+<td>MiniMax-M1: Scaling Test-Time Compute Efficiently with Lightning Attention</td>
+</tr>
+<tr>
+<td>2025-06-25</td>
+<td><a href="http://arxiv.org/abs/2506.20160">2506.20160</a></td>
+<td>AALC: Large Language Model Efficient Reasoning via Adaptive Accuracy-Length Control</td>
+</tr>
+<tr>
+<td>2025-07-01</td>
+<td><a href="http://arxiv.org/abs/2507.00711">2507.00711</a></td>
+<td>Large Reasoning Models are not thinking straight: on the unreliability of thinking trajectories</td>
+</tr>
+<tr>
+<td>2025-07-13</td>
+<td><a href="http://arxiv.org/abs/2507.09662">2507.09662</a></td>
+<td>Towards Concise and Adaptive Thinking in Large Reasoning Models: A Survey</td>
+</tr>
+<tr>
+<td>2025-08-01</td>
+<td><a href="http://arxiv.org/abs/2508.00574">2508.00574</a></td>
+<td>SynAdapt: Learning Adaptive Reasoning in Large Language Models via Synthetic Continuous Chain-of-Thought</td>
+</tr>
+<tr>
+<td>2025-08-04</td>
+<td><a href="https://arxiv.org/abs/2508.02178">2508.02178</a></td>
+<td>Reconsidering Overthinking: Penalizing Internal and External Redundancy in CoT Reasoning</td>
+</tr>
+<tr>
+<td>2025-08-04</td>
+<td><a href="http://arxiv.org/abs/2508.02120">2508.02120</a></td>
+<td>Don't Overthink It: A Survey of Efficient R1-style Large Reasoning Models</td>
+</tr>
+<tr>
+<td>2025-08-18</td>
+<td><a href="http://arxiv.org/abs/2508.13141">2508.13141</a></td>
+<td>OptimalThinkingBench: Evaluating Over and Underthinking in LLMs</td>
+</tr>
+<tr>
+<td>2025-08-18</td>
+<td><a href="http://arxiv.org/abs/2508.12604">2508.12604</a></td>
+<td>SSPO: Self-traced Step-wise Preference Optimization for Process Supervision and Reasoning Compression</td>
+</tr>
+<tr>
+<td>2025-08-21</td>
+<td><a href="http://arxiv.org/abs/2508.15507">2508.15507</a></td>
+<td>Think in Blocks: Adaptive Reasoning from Direct Response to Deep Reasoning</td>
+</tr>
+<tr>
+<td>2025-08-24</td>
+<td><a href="https://arxiv.org/abs/2508.17196">2508.17196</a></td>
+<td>BudgetThinker: Empowering Budget-aware LLM Reasoning with Control Tokens</td>
+</tr>
+<tr>
+<td>2025-09-09</td>
+<td><a href="http://arxiv.org/abs/2509.07820">2509.07820</a></td>
+<td>Certainty-Guided Reasoning in Large Language Models: A Dynamic Thinking Budget Approach</td>
+</tr>
+<tr>
+<td>2025-09-15</td>
+<td><a href="https://arxiv.org/abs/2509.12464">2509.12464</a></td>
+<td>Reasoning Models Can be Accurately Pruned Via Chain-of-Thought Reconstruction</td>
+</tr>
+<tr>
+<td>2025-09-17</td>
+<td><a href="http://arxiv.org/abs/2509.14093">2509.14093</a></td>
+<td>SEER: Self-Enhancing Chain-of-Thought Compression for Reasoning Models</td>
+</tr>
+<tr>
+<td>2025-09-17</td>
+<td><a href="https://arxiv.org/abs/2509.14004">2509.14004</a></td>
+<td>Early Stopping Chain-of-thoughts in Large Language Models</td>
+</tr>
+<tr>
+<td>2025-09-29</td>
+<td><a href="http://arxiv.org/abs/2510.00071">2510.00071</a></td>
+<td>ARS: Adaptive Reasoning Suppression for Efficient Large Reasoning Language Models</td>
+</tr>
+<tr>
+<td>2025-10-01</td>
+<td><a href="http://arxiv.org/abs/2510.01459">2510.01459</a></td>
+<td>LSPO: Length-aware Dynamic Sampling for Policy Optimization in LLM Reasoning</td>
+</tr>
+<tr>
+<td>2025-10-02</td>
+<td><a href="http://arxiv.org/abs/2510.02249">2510.02249</a></td>
+<td>Explore Briefly, Then Decide: Mitigating LLM Overthinking via Cumulative Entropy Regulation</td>
+</tr>
+<tr>
+<td>2025-10-06</td>
+<td><a href="https://arxiv.org/abs/2510.04617">2510.04617</a></td>
+<td>AdaR: A Framework for Equipping LLMs with Adaptive Reasoning</td>
+</tr>
+<tr>
+<td>2025-10-15</td>
+<td><a href="http://arxiv.org/abs/2510.13797">2510.13797</a></td>
+<td>Breadcrumbs Reasoning: Memory-Efficient Reasoning with Compression Beacons</td>
+</tr>
+<tr>
+<td>2025-10-22</td>
+<td><a href="https://arxiv.org/abs/2510.19669">2510.19669</a></td>
+<td>DiffAdapt: Difficulty-Adaptive Reasoning for Token-Efficient LLM Inference</td>
+</tr>
+<tr>
+<td>2025-10-22</td>
+<td><a href="http://arxiv.org/abs/2510.19176">2510.19176</a></td>
+<td>The Zero-Step Thinking: An Empirical Study of Mode Selection as Harder Early Exit in Reasoning Models</td>
+</tr>
+<tr>
+<td>2025-11-03</td>
+<td><a href="http://arxiv.org/abs/2511.01170">2511.01170</a></td>
+<td>DART: Difficulty-Adaptive Reasoning Truncation for Efficient Large Language Models</td>
+</tr>
+<tr>
+<td>2025-11-04</td>
+<td><a href="https://arxiv.org/abs/2511.02603">2511.02603</a></td>
+<td>CGES: Confidence-Guided Early Stopping for Efficient and Accurate Self-Consistency</td>
+</tr>
+<tr>
+<td>2025-11-05</td>
+<td><a href="http://arxiv.org/abs/2511.03408">2511.03408</a></td>
+<td>Efficient Reasoning via Thought-Training and Thought-Free Inference</td>
+</tr>
+<tr>
+<td>2025-11-06</td>
+<td><a href="http://arxiv.org/abs/2511.04108">2511.04108</a></td>
+<td>Batch Prompting Suppresses Overthinking Reasoning Under Constraint: How Batch Prompting Suppresses Overthinking in Reasoning Models</td>
+</tr>
+<tr>
+<td>2025-11-12</td>
+<td><a href="http://arxiv.org/abs/2511.09158">2511.09158</a></td>
+<td>Efficient Reasoning via Reward Model</td>
+</tr>
+<tr>
+<td>2025-11-13</td>
+<td><a href="http://arxiv.org/abs/2511.10714">2511.10714</a></td>
+<td>BadThink: Triggered Overthinking Attacks on Chain-of-Thought Reasoning in Large Language Models</td>
+</tr>
+<tr>
+<td>2025-11-13</td>
+<td><a href="http://arxiv.org/abs/2511.09865">2511.09865</a></td>
+<td>In-Token Rationality Optimization: Towards Accurate and Concise LLM Reasoning via Self-Feedback</td>
+</tr>
+<tr>
+<td>2025-11-13</td>
+<td><a href="http://arxiv.org/abs/2511.10201">2511.10201</a></td>
+<td>EffiReason-Bench: A Unified Benchmark for Evaluating and Advancing Efficient Reasoning in Large Language Models</td>
+</tr>
+<tr>
+<td>2025-11-13</td>
+<td><a href="http://arxiv.org/abs/2511.10788">2511.10788</a></td>
+<td>From Efficiency to Adaptivity: A Deeper Look at Adaptive Reasoning in Large Language Models</td>
+</tr>
+<tr>
+<td>2025-11-18</td>
+<td><a href="http://arxiv.org/abs/2511.14258">2511.14258</a></td>
+<td>Entropy-Guided Reasoning Compression</td>
+</tr>
+<tr>
+<td>2025-12-01</td>
+<td><a href="http://arxiv.org/abs/2512.01457">2512.01457</a></td>
+<td>Zero-Overhead Introspection for Adaptive Test-Time Compute</td>
+</tr>
+<tr>
+<td>2025-12-01</td>
+<td><a href="http://arxiv.org/abs/2512.02008">2512.02008</a></td>
+<td>The Art of Scaling Test-Time Compute for Large Language Models</td>
+</tr>
+<tr>
+<td>2025-12-04</td>
+<td><a href="http://arxiv.org/abs/2512.11847">2512.11847</a></td>
+<td>Tiny Recursive Models on ARC-AGI-1: Inductive Biases, Identity Conditioning, and Test-Time Compute</td>
+</tr>
+<tr>
+<td>2025-12-04</td>
+<td><a href="http://arxiv.org/abs/2512.04558">2512.04558</a></td>
+<td>On the Limits of Test-Time Compute: Sequential Reward Filtering for Better Inference</td>
+</tr>
+<tr>
+<td>2025-12-12</td>
+<td><a href="http://arxiv.org/abs/2512.12008">2512.12008</a></td>
+<td>Hold Onto That Thought: Assessing KV Cache Compression On Reasoning</td>
+</tr>
+<tr>
+<td>2025-12-19</td>
+<td><a href="http://arxiv.org/abs/2601.06052">2601.06052</a></td>
+<td>Reinforcement Learning for Chain of Thought Compression with One-Domain-to-All Generalization</td>
+</tr>
+<tr>
+<td>2025-12-30</td>
+<td><a href="http://arxiv.org/abs/2512.23988">2512.23988</a></td>
+<td>Fantastic Reasoning Behaviors and Where to Find Them: Unsupervised Discovery of the Reasoning Process</td>
+</tr>
+<tr>
+<td>2026-01-06</td>
+<td><a href="http://arxiv.org/abs/2601.02972">2601.02972</a></td>
+<td>Correct, Concise and Complete: Multi-stage Training For Adaptive Reasoning</td>
+</tr>
+<tr>
+<td>2026-01-06</td>
+<td><a href="https://arxiv.org/abs/2601.03066">2601.03066</a></td>
+<td>Do LLMs Encode Functional Importance of Reasoning Tokens?</td>
+</tr>
+<tr>
+<td>2026-01-07</td>
+<td><a href="https://arxiv.org/abs/2601.04442">2601.04442</a></td>
+<td>Addressing Overthinking in Large Vision-Language Models via Gated Perception-Reasoning Optimization</td>
+</tr>
+<tr>
+<td>2026-01-07</td>
+<td><a href="https://arxiv.org/abs/2601.03506">2601.03506</a></td>
+<td>QA-Merging: Query-Adaptive Reasoning via Layer Selective Model Merging</td>
+</tr>
+<tr>
+<td>2026-01-07</td>
+<td><a href="http://arxiv.org/abs/2601.03550">2601.03550</a></td>
+<td>ReEfBench: Quantifying the Reasoning Efficiency of LLMs</td>
+</tr>
+<tr>
+<td>2026-01-08</td>
+<td><a href="http://arxiv.org/abs/2601.04973">2601.04973</a></td>
+<td>ConMax: Confidence-Maximizing Compression for Efficient Chain-of-Thought Reasoning</td>
+</tr>
+<tr>
+<td>2026-01-16</td>
+<td><a href="https://arxiv.org/abs/2601.11038">2601.11038</a></td>
+<td>Budget-Aware Anytime Reasoning with LLM-Synthesized Preference Data</td>
+</tr>
+<tr>
+<td>2026-01-25</td>
+<td><a href="http://arxiv.org/abs/2601.17982">2601.17982</a></td>
+<td>SD-E$^2$: Semantic Exploration for Reasoning Under Token Budgets</td>
+</tr>
+<tr>
+<td>2026-01-26</td>
+<td><a href="http://arxiv.org/abs/2601.18091">2601.18091</a></td>
+<td>From LLMs to LRMs: Rethinking Pruning for Reasoning-Centric Models</td>
+</tr>
+<tr>
+<td>2026-01-28</td>
+<td><a href="http://arxiv.org/abs/2601.20467">2601.20467</a></td>
+<td>CtrlCoT: Dual-Granularity Chain-of-Thought Compression for Controllable Reasoning</td>
+</tr>
+<tr>
+<td>2026-01-29</td>
+<td><a href="http://arxiv.org/abs/2601.21711">2601.21711</a></td>
+<td>TACLer: Tailored Curriculum Reinforcement Learning for Efficient Reasoning</td>
+</tr>
+<tr>
+<td>2026-01-29</td>
+<td><a href="http://arxiv.org/abs/2601.22069">2601.22069</a></td>
+<td>VTC-R1: Vision-Text Compression for Efficient Long-Context Reasoning</td>
+</tr>
+<tr>
+<td>2026-01-29</td>
+<td><a href="http://arxiv.org/abs/2601.21418">2601.21418</a></td>
+<td>Mitigating Overthinking in Large Reasoning Models via Difficulty-aware Reinforcement Learning</td>
+</tr>
+<tr>
+<td>2026-01-29</td>
+<td><a href="https://arxiv.org/abs/2601.21839">2601.21839</a></td>
+<td>Test-Time Compute Games</td>
+</tr>
+<tr>
+<td>2026-01-29</td>
+<td><a href="https://arxiv.org/abs/2601.21576">2601.21576</a></td>
+<td>Chain Of Thought Compression: A Theoretical Analysis</td>
+</tr>
+<tr>
+<td>2026-02-01</td>
+<td><a href="https://arxiv.org/abs/2602.01070">2602.01070</a></td>
+<td>What If We Allocate Test-Time Compute Adaptively?</td>
+</tr>
+<tr>
+<td>2026-02-02</td>
+<td><a href="https://arxiv.org/abs/2602.02010">2602.02010</a></td>
+<td>NEAT: Neuron-Based Early Exit for Large Reasoning Models</td>
+</tr>
+<tr>
+<td>2026-02-02</td>
+<td><a href="http://arxiv.org/abs/2602.01523">2602.01523</a></td>
+<td>A Relative-Budget Theory for Reinforcement Learning with Verifiable Rewards in Large Language Model Reasoning</td>
+</tr>
+<tr>
+<td>2026-02-03</td>
+<td><a href="https://arxiv.org/abs/2602.03814">2602.03814</a></td>
+<td>Conformal Thinking: Risk Control for Reasoning on a Compute Budget</td>
+</tr>
+<tr>
+<td>2026-02-05</td>
+<td><a href="https://arxiv.org/abs/2602.05307">2602.05307</a></td>
+<td>MentorCollab: Large-to-Small Inference-Time Mentorship for Concise Reasoning in Language Models</td>
+</tr>
+<tr>
+<td>2026-02-05</td>
+<td><a href="http://arxiv.org/abs/2602.05539">2602.05539</a></td>
+<td>Steering Large Reasoning Models towards Concise Reasoning via Flow Matching</td>
+</tr>
+<tr>
+<td>2026-02-09</td>
+<td><a href="https://arxiv.org/abs/2602.08324">2602.08324</a></td>
+<td>Towards Efficient Large Language Reasoning Models via Extreme-Ratio Chain-of-Thought Compression</td>
+</tr>
+<tr>
+<td>2026-02-09</td>
+<td><a href="http://arxiv.org/abs/2602.08948">2602.08948</a></td>
+<td>CoRefine: Confidence-Guided Self-Refinement for Adaptive Test-Time Compute</td>
+</tr>
+<tr>
+<td>2026-02-10</td>
+<td><a href="https://arxiv.org/abs/2602.09574">2602.09574</a></td>
+<td>Aligning Tree-Search Policies with Fixed Token Budgets in Test-Time Scaling of LLMs</td>
+</tr>
+<tr>
+<td>2026-02-10</td>
+<td><a href="https://arxiv.org/abs/2602.09555">2602.09555</a></td>
+<td>Adaptive Test-Time Compute Allocation for Block Diffusion Language Models in Complex Reasoning</td>
+</tr>
+<tr>
+<td>2026-02-10</td>
+<td><a href="https://arxiv.org/abs/2602.09805">2602.09805</a></td>
+<td>Beyond Accuracy: Decomposing the Reasoning Efficiency of LLMs</td>
+</tr>
+<tr>
+<td>2026-02-10</td>
+<td><a href="http://arxiv.org/abs/2602.09485">2602.09485</a></td>
+<td>Bridging Efficiency and Transparency: Explainable CoT Compression in Multimodal Large Reasoning Models</td>
+</tr>
+<tr>
+<td>2026-02-11</td>
+<td><a href="https://arxiv.org/abs/2602.11133">2602.11133</a></td>
+<td>Just on Time: Token-Level Early Stopping for Diffusion Language Models</td>
+</tr>
+<tr>
+<td>2026-02-12</td>
+<td><a href="http://arxiv.org/abs/2602.11639">2602.11639</a></td>
+<td>PACE: Prefix-Protected and Difficulty-Aware Compression for Efficient Reasoning</td>
+</tr>
+<tr>
+<td>2026-02-12</td>
+<td><a href="http://arxiv.org/abs/2602.12113">2602.12113</a></td>
+<td>Stop Unnecessary Reflection: Training LRMs for Efficient Reasoning with Adaptive Reflection and Length Coordinated Penalty</td>
+</tr>
+<tr>
+<td>2026-02-13</td>
+<td><a href="https://arxiv.org/abs/2602.13517">2602.13517</a></td>
+<td>Think Deep, Not Just Long: Measuring LLM Reasoning Effort via Deep-Thinking Tokens</td>
+</tr>
+<tr>
+<td>2026-02-15</td>
+<td><a href="https://arxiv.org/abs/2602.13935">2602.13935</a></td>
+<td>Statistical Early Stopping for Reasoning Models</td>
+</tr>
+<tr>
+<td>2026-02-16</td>
+<td><a href="http://arxiv.org/abs/2602.14451">2602.14451</a></td>
+<td>Precedent-Informed Reasoning: Mitigating Overthinking in Large Reasoning Models via Test-Time Precedent Learning</td>
+</tr>
+<tr>
+<td>2026-02-28</td>
+<td><a href="http://arxiv.org/abs/2603.00578">2603.00578</a></td>
+<td>Draft-Thinking: Learning Efficient Reasoning in Long Chain-of-Thought LLMs</td>
+</tr>
+<tr>
+<td>2026-03-03</td>
+<td><a href="http://arxiv.org/abs/2603.02615">2603.02615</a></td>
+<td>Think, But Don't Overthink: Reproducing Recursive Language Models</td>
+</tr>
+<tr>
+<td>2026-03-04</td>
+<td><a href="http://arxiv.org/abs/2603.20224">2603.20224</a></td>
+<td>Beyond Test-Time Compute Strategies: Advocating Energy-per-Token in LLM Inference</td>
+</tr>
+<tr>
+<td>2026-03-09</td>
+<td><a href="http://arxiv.org/abs/2603.08659">2603.08659</a></td>
+<td>CODA: Difficulty-Aware Compute Allocation for Adaptive Reasoning</td>
+</tr>
+<tr>
+<td>2026-03-09</td>
+<td><a href="https://arxiv.org/abs/2603.08462">2603.08462</a></td>
+<td>Reasoning as Compression: Unifying Budget Forcing via the Conditional Information Bottleneck</td>
+</tr>
+<tr>
+<td>2026-03-13</td>
+<td><a href="https://arxiv.org/abs/2603.12529">2603.12529</a></td>
+<td>TERMINATOR: Learning Optimal Exit Points for Early Stopping in Chain-of-Thought Reasoning</td>
+</tr>
+<tr>
+<td>2026-03-13</td>
+<td><a href="http://arxiv.org/abs/2603.13628">2603.13628</a></td>
+<td>Locatability-Guided Adaptive Reasoning for Image Geo-Localization with Vision-Language Models</td>
+</tr>
+<tr>
+<td>2026-03-15</td>
+<td><a href="http://arxiv.org/abs/2603.14251">2603.14251</a></td>
+<td>Mitigating Overthinking in Large Reasoning Language Models via Reasoning Path Deviation Monitoring</td>
+</tr>
+<tr>
+<td>2026-03-16</td>
+<td><a href="http://arxiv.org/abs/2603.14745">2603.14745</a></td>
+<td>CAMD: Coverage-Aware Multimodal Decoding for Efficient Reasoning of Multimodal Large Language Models</td>
+</tr>
+<tr>
+<td>2026-03-23</td>
+<td><a href="https://arxiv.org/abs/2603.22016">2603.22016</a></td>
+<td>ROM: Real-time Overthinking Mitigation via Streaming Detection and Intervention</td>
+</tr>
+<tr>
+<td>2026-03-29</td>
+<td><a href="https://arxiv.org/abs/2604.19780">2604.19780</a></td>
+<td>Avoiding Overthinking and Underthinking: Curriculum-Aware Budget Scheduling for LLMs</td>
+</tr>
+<tr>
+<td>2026-04-01</td>
+<td><a href="http://arxiv.org/abs/2604.00510">2604.00510</a></td>
+<td>Adaptive Parallel Monte Carlo Tree Search for Efficient Test-time Compute Scaling</td>
+</tr>
+<tr>
+<td>2026-04-02</td>
+<td><a href="http://arxiv.org/abs/2604.02040">2604.02040</a></td>
+<td>Efficient Reasoning via Thought Compression for Language Segmentation</td>
+</tr>
+<tr>
+<td>2026-04-02</td>
+<td><a href="http://arxiv.org/abs/2604.02155">2604.02155</a></td>
+<td>Brief Is Better: Non-Monotonic Chain-of-Thought Budget Effects in Function-Calling Language Agents</td>
+</tr>
+<tr>
+<td>2026-04-02</td>
+<td><a href="https://arxiv.org/abs/2604.02460">2604.02460</a></td>
+<td>Single-Agent LLMs Outperform Multi-Agent Systems on Multi-Hop Reasoning Under Equal Thinking Token Budgets</td>
+</tr>
+<tr>
+<td>2026-04-03</td>
+<td><a href="https://arxiv.org/abs/2604.26954">2604.26954</a></td>
+<td>The Impact of LLM Self-Consistency and Reasoning Effort on Automated Scoring Accuracy and Cost</td>
+</tr>
+<tr>
+<td>2026-04-04</td>
+<td><a href="http://arxiv.org/abs/2604.03679">2604.03679</a></td>
+<td>LightThinker++: From Reasoning Compression to Memory Management</td>
+</tr>
+<tr>
+<td>2026-04-05</td>
+<td><a href="https://arxiv.org/abs/2604.04120">2604.04120</a></td>
+<td>Shorter, but Still Trustworthy? An Empirical Study of Chain-of-Thought Compression</td>
+</tr>
+<tr>
+<td>2026-04-06</td>
+<td><a href="https://arxiv.org/abs/2604.04930">2604.04930</a></td>
+<td>Early Stopping for Large Reasoning Models via Confidence Dynamics</td>
+</tr>
+<tr>
+<td>2026-04-07</td>
+<td><a href="https://arxiv.org/abs/2604.06465">2604.06465</a></td>
+<td>Multi-objective Evolutionary Merging Enables Efficient Reasoning Models</td>
+</tr>
+<tr>
+<td>2026-04-07</td>
+<td><a href="https://arxiv.org/abs/2604.05643">2604.05643</a></td>
+<td>Graph-Based Chain-of-Thought Pruning for Reducing Redundant Reflections in Reasoning LLMs</td>
+</tr>
+<tr>
+<td>2026-04-08</td>
+<td><a href="https://arxiv.org/abs/2604.14214">2604.14214</a></td>
+<td>CROP: Token-Efficient Reasoning in Large Language Models via Regularized Prompt Optimization</td>
+</tr>
+<tr>
+<td>2026-04-09</td>
+<td><a href="http://arxiv.org/abs/2604.08369">2604.08369</a></td>
+<td>Don't Overthink It: Inter-Rollout Action Agreement as a Free Adaptive-Compute Signal for LLM Agents</td>
+</tr>
+</tbody>
+</table>
+<h2 id="_5">纵向脉络与方法比较</h2>
+<ul>
+<li><strong>2024 年末：先发现问题。</strong> C3oT、CCoT、TALE/Token-Budget-Aware 和 “Do NOT Think That Much” 建立“CoT 太长、预算应按题目变化”的问题定义；MCoT 通过 Markov 摘要减少 KV 依赖。</li>
+<li><strong>2025 年上半年：压缩与早停并行。</strong> TokenSkip、ConCISE、Long–Short SFT、ReCUT、AALC、Dynamic Early Exit 等开始用 compressor、confidence、step trail 或 preference optimization；“When More is Less” 给出倒 U 曲线和 simplicity bias，成为后续方法的理论动机。</li>
+<li><strong>2025 年下半年：从长度转向内容/自适应。</strong> overthinking/self-doubt、内部/外部 redundancy、SSPO、BudgetThinker、SEER、ARS、entropy regulation 等分别处理反思、预算控制和 token/step 重要性；HERMES 把形式验证插入数学链，兼顾准确率和成本。</li>
+<li><strong>2026 年一季度：预算、停止和潜在状态的统一。</strong> QA-Merging、ENTRA、CtrlCoT、difficulty-aware RL、Extra-CoT、CRT、PACE、ESTAR、TERMINATOR、ROM、BACR 等把路由、风险控制、prefix 保护、最优 exit 和 latent/flow matching 纳入统一 trade-off。</li>
+<li><strong>2026 年二季度以后：状态/因果/系统耦合。</strong> STACK/CRISP/TRACE/TRACES/PUMA/ASAG 用状态、saliency、语义冗余和 attention 做停压；ICR/ExpThink/LEAD/HMPO/DRE/ADaPT 处理 RL credit assignment；GLR/SLT/CIRF/LTF 把表面文字换成选择性或连续 latent；ReCo/ReasonAlloc/CASK/RATIO 说明 cache、量化与 token inflation 不能分开优化。</li>
+</ul>
+<h3 id="_6">我认为最重要的未解决问题</h3>
+<ol>
+<li><strong>“答案正确”不等于“推理充分”。</strong> 早停监督大多依赖最终答案 verifier，容易训练出早答、后解释或不可审计 latent state。</li>
+<li><strong>长度不是冗余的充分统计量。</strong> 重复 token、必要自纠错、低概率关键跳转在表面长度上不可分；entropy/logprob/attention 单信号都被近期反例削弱。</li>
+<li><strong>平均预算掩盖尾部风险。</strong> 共享预算和难题分配需要 risk-sensitive objective，例如最大化 (\sum_i v_i A_i) 同时控制 P99 latency，而非只约束平均 token。</li>
+<li><strong>训练节省与推理节省不同。</strong> 许多 compression 方法离线需要多 rollout、教师重写、检索或树搜索；应同时报告 data-construction FLOPs、训练 FLOPs、prefill/decode latency 和 KV memory。</li>
+<li><strong>数学 benchmark 的可验证性造成选择偏差。</strong> 结论常在 GSM8K/MATH/AIME 成立；开放数学证明、形式 Lean、工具调用和多语言题仍需验证。</li>
+<li><strong>监控与忠实性冲突。</strong> latent/abstract/function token 能降成本，却让人类和 verifier 难以检查；短 CoT 可能只是把错误藏到不可见状态。</li>
+</ol>
+<h2 id="_7">研究复现建议</h2>
+<p>若要在自己的模型上比较方法，建议固定同一问题集、随机种子、temperature、答案抽取器和硬件；画出每个方法的 ((\text{accuracy},\text{mean tokens},\text{P95 latency},\text{KV memory})) Pareto 曲线，并分别报告 easy/medium/hard、首次正确 prefix、答案后 token、以及被早停后重新从头生成的反事实。不要用单一“平均 token 降幅”宣称方法优越。</p>
+<h2 id="_8">证据文件</h2>
+<p>本轮机器可复核产物位于：</p>
+<ul>
+<li><code>local evidence inventory (not published)</code>：421 条宽候选。</li>
+<li><code>local two-year candidate table (not published)</code>：两年标题直接相关候选。</li>
+<li><code>local recent candidate table (not published)</code>：近半年主题相关候选。</li>
+<li><code>local downloaded PDFs (not published)</code>、<code>txt</code>：下载的 arXiv PDF 与文本抽取。</li>
+</ul>
+<h2 id="_9">附：两篇边界方法的简要定位</h2>
+<ul>
+<li><strong>Beyond Repeated Sampling（2609.26704）</strong>：训练一个 concept generator，输出简短、问题特定的 exploration hints，引导冻结的下游大模型；它减少的是无效搜索分支而非直接裁剪 CoT，属于搜索策略邻接方法。主要风险是 hint generator 与下游 solver 的分布错配，以及短 hint 可能删掉必要的数学计划。</li>
+<li><strong>Port-Hamiltonian Latent Deliberation（2609.37351）</strong>：针对 latent recurrent reasoning 的深度 deliberation drift，使用 contact Hamiltonian、RATTLE 和自适应 Riemannian RK45 稳定长 horizon。它改善的是“为了省文字而转 latent 后深推理崩溃”，不是直接的数学 CoT 压缩；复杂数值积分和稳定性假设会增加每步成本。</li>
+</ul></main></body></html>
