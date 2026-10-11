@@ -93,6 +93,7 @@
 <h2 id="2026-04-102026-10-10">近半年逐篇分析（2026-04-10—2026-10-10）</h2>
 <p>以下每条都按“方法—动机/目标—缺陷与新问题—结论”写。数字是论文自报结果，尚未做统一硬件复现实验。</p>
 <h3 id="1-stack-think-less-know-more2604091502026-04-10">1. <a href="https://arxiv.org/abs/2604.09150">STACK — Think Less, Know More</a>（2604.09150，2026-04-10）</h3>
+<p><strong>背景。</strong> 数学 CoT 让模型逐步生成解题过程，每一步都可能继续展开、压缩或停止。不同题目的冗余来源不同，单一规则难以同时处理知识不足、重复解释和无效验证。</p>
 <blockquote>
 <p>代码状态：未发现公开代码/项目页。</p>
 </blockquote>
@@ -100,6 +101,7 @@
 <p><strong>动机/目标。</strong> 统一压缩把关键自纠错步骤和重复核验一视同仁；STACK 假设冗余来源随推理阶段变化。作者在三个数学基准报告平均长度降 59.9%、准确率升 4.8 个百分点。</p>
 <p><strong>缺陷/新问题。</strong> 在线对比采样和检索带来训练开销；检索错误会把偏置写入压缩轨迹，频繁检索还会增大上下文、稀释注意力。它依赖可验证答案和文本知识，开放题、工具/多模态场景的“状态标签”并不可靠；PPO+DPO 的两个信号可能互相争夺梯度。新问题是：压缩器学到的是通用冗余还是某个 benchmark 的检索模板？</p>
 <h3 id="2-when-more-thinking-hurts2604107392026-04-12">2. <a href="https://arxiv.org/abs/2604.10739">When More Thinking Hurts</a>（2604.10739，2026-04-12）</h3>
+<p><strong>背景。</strong> 测试时计算指通过额外采样、思考或验证换取准确率。思考越久不一定越好，模型可能在得到正确答案后继续怀疑并改错，因此需要区分有益思考与有害过度思考。</p>
 <blockquote>
 <p>代码状态：官方项目/补充材料，未发现独立仓库。</p>
 </blockquote>
@@ -107,6 +109,7 @@
 <p><strong>动机/目标。</strong> 反驳“更多 token 单调更好”的默认假设，为动态停止提供曲线证据。</p>
 <p><strong>缺陷/新问题。</strong> 诊断依赖可强制截断和可解析答案；边际收益会随解码温度、模型版本、答案抽取器改变。它告诉我们哪里该停，却没有可部署的 stopping policy；如果直接把观察到的最优长度硬编码，会在分布外题目上欠思考。</p>
 <h3 id="3-adacompute-code2604148532026-04-16">3. <a href="https://arxiv.org/abs/2604.14853">AdaCompute</a> · <a href="https://github.com/zhiyuanZhai20/AdaCompute-LLM">Code</a>（2604.14853，2026-04-16）</h3>
+<p><strong>背景。</strong> 推理预算可以是每题的 rollout 次数或生成 token 数，统一分配会浪费简单题的计算并挤压难题预算。自适应方法需要比较各题不同动作的成本和成功概率，再满足总预算约束。</p>
 <blockquote>
 <p>代码状态：官方代码。</p>
 </blockquote>
@@ -114,6 +117,7 @@
 <p><strong>动机/目标。</strong> uniform rollout 把预算浪费在简单题、不给难题足够计算。MATH/GSM8K 报告相同预算下最高约 12.8% 相对准确率提升，模仿准确率超过 91%。</p>
 <p><strong>缺陷/新问题。</strong> oracle 需要先为每题跑多种动作，离线成本高；分类器误差在 action gap 大的题上会放大 regret。平均预算约束可能牺牲尾部难题或高价值题，且训练分布固定，不能处理题目价值不同的在线队列。</p>
 <h3 id="4-trace-code2604173042026-04-19">4. <a href="https://arxiv.org/abs/2604.17304">TRACE</a> · <a href="https://github.com/jiakunli-1/TRACE">Code</a>（2604.17304，2026-04-19）</h3>
+<p><strong>背景。</strong> 早停常依据并行回答的投票分布或模型置信度判断答案是否稳定，但多步推理中的单点置信度会波动。观察一段时间的持续一致性，才能减少把短暂高置信误判为收敛。</p>
 <blockquote>
 <p>代码状态：官方代码。</p>
 </blockquote>
@@ -121,6 +125,7 @@
 <p><strong>动机/目标。</strong> 单步 confidence 在多步自纠错中会抖动；时间聚合更接近“已经收敛”。</p>
 <p><strong>缺陷/新问题。</strong> 一致的错误答案会触发过早停止，难题的正确答案可能在短暂低置信后出现；窗口大小和阈值对模型/温度敏感。它只观察答案分布，无法判断证明结构是否完整，可能留下“答案对但过程断裂”的前缀。</p>
 <h3 id="5-crisp-code2604172972026-04-19">5. <a href="https://arxiv.org/abs/2604.17297">CRISP</a> · <a href="https://github.com/yslanprime/CRISP">Code</a>（2604.17297，2026-04-19）</h3>
+<p><strong>背景。</strong> Transformer attention 描述 token 与上下文的关联，推理模型还常用结束标记表示思考段落完成。若结束标记持续关注某些位置，attention 就可作为判断步骤重要性的线索。</p>
 <blockquote>
 <p>代码状态：官方代码。</p>
 </blockquote>
@@ -128,6 +133,7 @@
 <p><strong>动机/目标。</strong> 外部 compressor 不懂源模型内部动力学，会误删自纠错；CRISP 报告 50–60% token reduction 且准确率基本不变。</p>
 <p><strong>缺陷/新问题。</strong> attention 是相关性而非因果重要性；换 tokenizer、没有显式 <code>&lt;/think&gt;</code> 的模型或开放题时锚点失效。数据构造仍需迭代搜索，离线成本把推理节省转移到训练；主要在结构化数学上验证，可能培养“看起来连贯但缺少隐含条件”的短链。</p>
 <h3 id="6-traces-code2604210572026-04-22">6. <a href="https://arxiv.org/abs/2604.21057">TRACES</a> · <a href="https://github.com/yannisbelkhiter/TRACES">Code</a>（2604.21057，2026-04-22）</h3>
+<p><strong>背景。</strong> 数学轨迹包含假设、计算、验证和重复核验等不同功能。只看长度或单次置信度无法判断当前片段是否仍在推进解题，因此需要识别行为类型及其转移。</p>
 <blockquote>
 <p>代码状态：疑似代码仓库，官方关联未确认。</p>
 </blockquote>
@@ -135,6 +141,7 @@
 <p><strong>动机/目标。</strong> 只看长度或最终 confidence 无法知道某一步的功能；step type 提供可解释信号。</p>
 <p><strong>缺陷/新问题。</strong> 在线标签器本身消耗计算且可能误读新颖的自纠错；困难题需要保守阈值，收益不稳定。标签是表面语言行为，模型可学会规避“重复”词而保留语义冗余，产生 reward hacking。</p>
 <h3 id="7-abstract-cot-code2604227092026-04-24">7. <a href="https://arxiv.org/abs/2604.22709">Abstract CoT</a> · <a href="https://github.com/bertybaums/abstract-cot">Code</a>（2604.22709，2026-04-24）</h3>
+<p><strong>背景。</strong> 自然语言 CoT 同时承载计算和解释，通常很长；latent reasoning 用隐藏向量或离散代码保存中间状态，可减少逐词生成。abstract token 试图在短序列、可训练性和可解释性之间折中。</p>
 <blockquote>
 <p>代码状态：疑似代码仓库，官方关联未确认。</p>
 </blockquote>
@@ -142,6 +149,7 @@
 <p><strong>动机/目标。</strong> 连续 latent 方法效果落后于 verbal CoT；离散 code 兼顾可训练性和短序列。</p>
 <p><strong>缺陷/新问题。</strong> abstract token 不可读、难监控，错误定位和过程监督更难；codebook 与 backbone/tokenizer 强耦合。短序列减少解码步却可能增加每步状态复杂度，且训练阶段仍需长 CoT。它把“冗长文本”换成“不可解释内部状态”，会削弱数学证明的可审计性。</p>
 <h3 id="8-large-language-models-decide-early-and-explain-later2604222662026-04-24">8. <a href="https://arxiv.org/abs/2604.22266">Large Language Models Decide Early and Explain Later</a>（2604.22266，2026-04-24）</h3>
+<p><strong>背景。</strong> 模型可能在完整解释结束前就基本确定答案，后续 token 只是把决定翻译成理由。这使“决定答案”和“结束解释”成为两个阶段，但答案稳定不等于证明完整。</p>
 <blockquote>
 <p>代码状态：未发现公开代码/项目页。</p>
 </blockquote>
@@ -149,6 +157,7 @@
 <p><strong>动机/目标。</strong> 区分“决定答案”和“事后解释”；后者是低收益延迟。</p>
 <p><strong>缺陷/新问题。</strong> 中间答案可能只是猜测，强制补全本身会改变 hidden state；答案稳定不等于证明稳定。对多答案、程序执行和需要最后一步计算的题，探针会把未完成的推理当作 post-decision explanation。</p>
 <h3 id="9-icr2605073162026-05-08">9. <a href="https://arxiv.org/abs/2605.07316">ICR</a>（2605.07316，2026-05-08）</h3>
+<p><strong>背景。</strong> 强化学习会为同题采样多条轨迹，并记录正确性和长度。长度—正确率关系能提示过度或不足思考；固定长度惩罚可能造成欠思考，所以需要短且正确的当前策略样本作参照。</p>
 <blockquote>
 <p>代码状态：官方项目/补充材料，未发现独立仓库。</p>
 </blockquote>
@@ -156,6 +165,7 @@
 <p><strong>动机/目标。</strong> 静态长度惩罚会把模型从过思考推到欠思考；短而正确的样本已自然存在于 rollout 中。</p>
 <p><strong>缺陷/新问题。</strong> 需要组内出现正确短样本；早期/难题可能没有，信号稀疏。ICR 是软约束，不能给严格 latency SLA；相关性定义会被题目混合、temperature 和 group size 扭曲。未来需解释模型容量、难度和 rollout 多样性如何共同决定 Pareto 前沿。</p>
 <h3 id="10-expthink2605075012026-05-08">10. <a href="https://arxiv.org/abs/2605.07501">ExpThink</a>（2605.07501，2026-05-08）</h3>
+<p><strong>背景。</strong> 模型能力会随训练变化，同一道题早期可能需要长思考、后期只需几步。固定长度目标无法跟随这种变化，历史最短正确解可以提供动态的简洁性参照。</p>
 <blockquote>
 <p>代码状态：官方项目/补充材料，未发现独立仓库。</p>
 </blockquote>
@@ -163,6 +173,7 @@
 <p><strong>动机/目标。</strong> 固定长度权重假设能力不变，无法反映同一题在训练后变容易；报告最多 77% 长度下降且准确率提升。</p>
 <p><strong>缺陷/新问题。</strong> 依赖可靠答案 verifier 和数学数据；短样本的偶然捷径会被记忆并放大。阈值/折扣仍是经验超参，experience buffer 可能偏向早期发现的模板，阻碍探索。</p>
 <h3 id="11-mpd2605087762026-05-09">11. <a href="https://arxiv.org/abs/2605.08776">MPD</a>（2605.08776，2026-05-09）</h3>
+<p><strong>背景。</strong> 知识蒸馏把教师行为迁移给较小学生，教师重写的短解有助于压缩 CoT。但学生在线采样与教师示范有分布偏移，需要同时处理探索、重写和概率对齐。</p>
 <blockquote>
 <p>代码状态：官方项目/补充材料，未发现独立仓库。</p>
 </blockquote>
@@ -170,6 +181,7 @@
 <p><strong>动机/目标。</strong> 大模型教师通常比小模型更会直接作答；把“短行为”迁移给部署友好的小模型。</p>
 <p><strong>缺陷/新问题。</strong> 论文明确不显式优化 correctness，错误 student trace 可能被教师压缩后学习；教师改写风格成为单点偏差。教师推理/重写成本可能超过学生节省，且 teacher/student tokenizer、能力差距会造成语义错配。</p>
 <h3 id="12-lead-code2605098062026-05-10">12. <a href="https://arxiv.org/abs/2605.09806">LEAD</a> · <a href="https://github.com/CrazyMint/LEAD">Code</a>（2605.09806，2026-05-10）</h3>
+<p><strong>背景。</strong> 效率强化学习要同时奖励正确和简短；全局固定长度权重会忽略题目难度，且造成奖励尺度不稳。按题目表现估计目标长度，才能区分过思考和欠思考。</p>
 <blockquote>
 <p>代码状态：官方代码。</p>
 </blockquote>
@@ -177,6 +189,7 @@
 <p><strong>动机/目标。</strong> 静态 reward 权重在 RL 过程中不适配，global length 不反映每题预算。论文报告五个数学基准上较高 accuracy-efficiency score。</p>
 <p><strong>缺陷/新问题。</strong> target length 由当前模型产生，容易自我确认和累积偏差；instability 的尺度跨题、跨模型不稳定。对罕见难题，最短正确 rollout 可能不存在，反而诱导 underthinking。</p>
 <h3 id="13-vpg-ea2605110192026-05-10">13. <a href="https://arxiv.org/abs/2605.11019">VPG-EA</a>（2605.11019，2026-05-10）</h3>
+<p><strong>背景。</strong> 变分推断把推理路径看成隐变量分布：prior 在未知答案时探索，posterior 在给定答案时集中到成功路径。后验可指导先验，但答案条件信息在真实推理时不可直接获得。</p>
 <blockquote>
 <p>代码状态：未发现公开代码/项目页。</p>
 </blockquote>
@@ -184,6 +197,7 @@
 <p><strong>动机/目标。</strong> 复杂 reward 令高质量短轨迹稀疏，prior exploration 采样瓶颈；posterior 提供密集方向。</p>
 <p><strong>缺陷/新问题。</strong> 推理时不可用的 answer-conditioned posterior 依赖高质量 reference；cross-view filter 错误会把捷径当高效。双流共享参数仍增加训练显存，ELBO 的 KL/长度权重改变后可能牺牲探索多样性。</p>
 <h3 id="14-puma-code2605176722026-05-17">14. <a href="https://arxiv.org/abs/2605.17672">PUMA</a> · <a href="https://github.com/giovanni-vaccarino/PUMA">Code</a>（2605.17672，2026-05-17）</h3>
+<p><strong>背景。</strong> 答案置信度只能说明模型当前偏向哪个答案，不能说明继续计算还能带来多少收益。选择性停止需要估计每个前缀的剩余可恢复价值，再决定是否继续投入 token。</p>
 <blockquote>
 <p>代码状态：官方代码。</p>
 </blockquote>
@@ -191,6 +205,7 @@
 <p><strong>动机/目标。</strong> confidence/答案一致性只说明 answer readiness，不说明 reasoning convergence；PUMA 增加语义新颖度信号。</p>
 <p><strong>缺陷/新问题。</strong> “新颖”与“必要”不是同义：最后一次关键代数变形可能与前句相似。detector 的训练分布和 verifier 的错误会叠加；对长程序、工具调用和形式证明，语义相似可能正是保持不变量所必需。</p>
 <h3 id="15-slt-code2605257452026-05-25">15. <a href="https://arxiv.org/abs/2605.25745">SLT</a> · <a href="https://github.com/hunshi34/SLT">Code</a>（2605.25745，2026-05-25）</h3>
+<p><strong>背景。</strong> 整条 CoT 都改成 latent token 可能压掉关键计算，全部保留自然语言又浪费解码步。span-level 压缩按片段决定使用 latent 或显式文本，因而压缩粒度很关键。</p>
 <blockquote>
 <p>代码状态：官方代码。</p>
 </blockquote>
@@ -198,6 +213,7 @@
 <p><strong>动机/目标。</strong> 均匀 latent compression 会压掉临界中间步骤；选择性混合显式/潜在表示。</p>
 <p><strong>缺陷/新问题。</strong> 预测器的 confidence 可能校准错误；latent span 不可审计，压缩边界错误会污染后续状态。三阶段流水线复杂，部署需支持 latent token 与显式 token 切换。</p>
 <h3 id="16-cirf2605282922026-05-27">16. <a href="https://arxiv.org/abs/2605.28292">CIRF</a>（2605.28292，2026-05-27）</h3>
+<p><strong>背景。</strong> 纯 latent CoT 缺少可读的步骤边界，纯自然语言又有表面冗余。功能单元方法用离散 token 表示有计算意义的语义单元，试图保留结构并减少逐词表达。</p>
 <blockquote>
 <p>代码状态：官方项目/补充材料，未发现独立仓库。</p>
 </blockquote>
@@ -205,6 +221,7 @@
 <p><strong>动机/目标。</strong> 纯隐式 CoT 缺乏 rationale 对齐与复杂度适应；功能单元降低语言表面开销。</p>
 <p><strong>缺陷/新问题。</strong> 单元切分错误会使一个 token 承载多个逻辑操作；功能词表跨任务迁移性未知。所谓“并行训练”不一定降低自回归推理步数，结果 token 的可选生成会引入新的停止策略。</p>
 <h3 id="17-quantized-reasoning-models-think-they-need-to-think-longer-code2606002062026-05-29">17. <a href="https://arxiv.org/abs/2606.00206">Quantized Reasoning Models Think They Need to Think Longer</a> · <a href="https://sanaelotfi.github.io/blog/quantized-reasoning-models/">Code</a>（2606.00206，2026-05-29）</h3>
+<p><strong>背景。</strong> 低比特量化会扰动 logits、token 概率和隐藏状态。微小扰动可能让模型放弃原本正确的中间答案并重新展开分支，导致准确率下降和总 token 增加。</p>
 <blockquote>
 <p>代码状态：官方项目/补充材料，未发现独立仓库。</p>
 </blockquote>
@@ -212,6 +229,7 @@
 <p><strong>动机/目标。</strong> 解释低比特推理的隐性 token 成本，而不是只看每 token 延迟。</p>
 <p><strong>缺陷/新问题。</strong> 主要是诊断，未给出通用修复器；KL 阈值依赖量化方案。若简单强制保留早期答案，会抑制必要的自纠错；量化与模型架构、校准集耦合，不能直接泛化所有 PTQ。</p>
 <h3 id="18-hab-thinking-economically2606011682026-05-31">18. <a href="https://arxiv.org/abs/2606.01168">HAB / Thinking Economically</a>（2606.01168，2026-05-31）</h3>
+<p><strong>背景。</strong> 链式思考带来准确率提升，但每道题和同一道题的不同步骤所需计算量并不相同。把所有问题、所有步骤都用同一长度或同一压缩率处理，会在简单环节浪费预算，也可能删掉难题的关键推导。因此需要同时判断题目难度和步骤重要性。</p>
 <blockquote>
 <p>代码状态：未发现公开代码/项目页。</p>
 </blockquote>
@@ -219,6 +237,7 @@
 <p><strong>动机/目标。</strong> 复杂度既跨问题异质，也在单题内部异质；uniform compression 会在简单步浪费、在关键步误删。</p>
 <p><strong>缺陷/新问题。</strong> PPL 是语言可预测性，不等于数学信息量；Fisher 近似对参数化敏感。两层控制器增加训练/推理开销，层级误差会传播（问题级错判时 step 级再精细也无济于事）。</p>
 <h3 id="19-glr2606022482026-06-01">19. <a href="https://arxiv.org/abs/2606.02248">GLR</a>（2606.02248，2026-06-01）</h3>
+<p><strong>背景。</strong> 显式 CoT 要把每个中间想法逐个解码成自然语言 token，既有词表和 softmax 开销，也会迫使模型过早选择具体表述。潜在推理把中间状态留在连续向量空间，但必须解决这些向量如何沿着一条有用的推理路径演化的问题。</p>
 <blockquote>
 <p>代码状态：未发现公开代码/项目页。</p>
 </blockquote>
@@ -226,6 +245,7 @@
 <p><strong>动机/目标。</strong> 离散文字每一步都付出 token/softmax 成本，并迫使模型过早提交具体词；连续路径保留计算而省表面解码。</p>
 <p><strong>缺陷/新问题。</strong> embedding 欧氏几何未必对应逻辑距离；路径漂移会导致 latent collapse 或不可解释错误。latent step 仍需 forward pass，token 减少不等于 FLOPs 同比例减少；从 CoT anchor 学到的是已有文字策略，可能限制真正新推理。</p>
 <h3 id="20-hmpo2606019342026-06-01">20. <a href="https://arxiv.org/abs/2606.01934">HMPO</a>（2606.01934，2026-06-01）</h3>
+<p><strong>背景。</strong> 强化学习压缩 CoT 时，奖励通常要同时鼓励答对和少生成 token。手工设定长度上限、分阶段训练或线性长度惩罚容易不稳定，还可能让模型用空答案或过短输出钻奖励漏洞，所以需要一种可扩展且把正确性放在首位的奖励设计。</p>
 <blockquote>
 <p>代码状态：论文称接收后公开，当前未发布。</p>
 </blockquote>
@@ -233,6 +253,7 @@
 <p><strong>动机/目标。</strong> 手工预算、多阶段训练和线性 length penalty 不稳且难扩展。</p>
 <p><strong>缺陷/新问题。</strong> median 可能掩盖双峰长度分布（简单题/难题混在一起）；乘法 reward 在正确率接近零时几乎没有压缩梯度。数学 verifier 的可得性限制跨到开放科学和主观任务。</p>
 <h3 id="21-harmful-overthinking-code2606028352026-06-01">21. <a href="https://arxiv.org/abs/2606.02835">harmful overthinking 评测</a> · <a href="https://github.com/SimoneCaldarella/thinking-past-the-answer">Code</a>（2606.02835，2026-06-01）</h3>
+<p><strong>背景。</strong> 长推理并不总是有益：模型可能已经在某个前缀得到正确答案，却继续生成冗余内容，甚至在反思中把正确答案改错。若只统计最终长度或最终准确率，就无法区分无害的啰嗦和会破坏答案的有害过度思考。</p>
 <blockquote>
 <p>代码状态：官方代码。</p>
 </blockquote>
@@ -240,6 +261,7 @@
 <p><strong>动机/目标。</strong> “长但正确”和“长导致错误”需要分开，否则只优化平均长度会误诊。</p>
 <p><strong>缺陷/新问题。</strong> first-correct 依赖可抽取/可验证答案，数学证明未必在首次可解析答案时完成；多模态起点和 benchmark 选择可能高估早停收益。它给出上限式 oracle，尚未解决在线如何知道 prefix 已正确。</p>
 <h3 id="22-acts-code2606039652026-06-02">22. <a href="https://arxiv.org/abs/2606.03965">ACTS</a> · <a href="https://github.com/Andree-9/ACTS">Code</a>（2606.03965，2026-06-02）</h3>
+<p><strong>背景。</strong> 已有高效推理方法主要回答“何时停止”或“生成多长”，很少控制模型在剩余预算内采用什么策略。复杂题可能需要探索，接近答案时更需要核验或总结，因此需要让一个控制器观察当前轨迹，再动态引导冻结的推理模型改变思考方式。</p>
 <blockquote>
 <p>代码状态：官方代码。</p>
 </blockquote>
@@ -247,6 +269,7 @@
 <p><strong>动机/目标。</strong> 早停/压缩只控制“多久”，不控制“怎么想”；在同一预算下切换探索、核验、总结策略。</p>
 <p><strong>缺陷/新问题。</strong> controller 的 phrase 会改变 reasoner 分布，带来 prompt-induced behavior；两个 agent 的推理开销可能抵消省下的 token。策略空间和预算条件多，训练稳定性与可解释性较差。</p>
 <h3 id="23-thinkbooster-code2606069152026-06-05">23. <a href="https://arxiv.org/abs/2606.06915">THINKBOOSTER</a> · <a href="https://github.com/IINemo/thinkbooster">Code</a>（2606.06915，2026-06-05）</h3>
+<p><strong>背景。</strong> 测试时计算扩展可以通过多次采样、束搜索、树搜索和验证器重排换取更高准确率，但不同方法常用不同基准、采样数和成本口径。没有统一的质量—计算评测，就很难判断一次准确率提升究竟付出了多少推理开销。</p>
 <blockquote>
 <p>代码状态：官方代码。</p>
 </blockquote>
@@ -254,6 +277,7 @@
 <p><strong>动机/目标。</strong> 现有 test-time scaling 实验协议碎片化，无法公平比较“准确率换了多少计算”。</p>
 <p><strong>缺陷/新问题。</strong> 基准和 proxy 解决工程可见性，不自动学习最佳停止；不同硬件/缓存/批处理的成本不可由 token 数代表。若 benchmark 的 scorer 偏好某种轨迹，结论会反过来指导错误的系统选择。</p>
 <h3 id="24-reasonalloc2606111642026-06-09">24. <a href="https://arxiv.org/abs/2606.11164">ReasonAlloc</a>（2606.11164，2026-06-09）</h3>
+<p><strong>背景。</strong> 长 CoT 会让每个已生成 token 的 key/value 保存在 KV cache 中，显著增加显存和带宽压力。已有压缩方法常把预算平均分给各层各头，或只针对静态 prompt；自回归数学推理中，不同层和注意力头在不同步骤的上下文需求可能并不相同。</p>
 <blockquote>
 <p>代码状态：未发现公开代码/项目页。</p>
 </blockquote>
@@ -261,6 +285,7 @@
 <p><strong>动机/目标。</strong> 长 CoT 的 KV cache 随 token 增长；prompt prefill 的静态分配不能描述 autoregressive reasoning 的逐步需求。</p>
 <p><strong>缺陷/新问题。</strong> cache 压缩减少内存不等于减少生成 token；错误 eviction 会破坏尚未显式表达的数学约束。ReasoningWave 可能随模型、层数、RoPE 和 batch size 改变；在线 head scoring 有额外 kernel/同步成本。</p>
 <h3 id="25-asag2606150702026-06-13">25. <a href="https://arxiv.org/abs/2606.15070">ASAG</a>（2606.15070，2026-06-13）</h3>
+<p><strong>背景。</strong> 早停器需要知道当前推理是否已经足够，但额外训练分类器或依赖提示词、外部置信度都可能成本高且不稳定。模型每一步都会产生 attention 分布，这些内部状态也许包含“正在推理、即将收敛或已经可以结束”的信号，因此可被用作免训练控制依据。</p>
 <blockquote>
 <p>代码状态：未发现公开代码/项目页。</p>
 </blockquote>
@@ -268,6 +293,7 @@
 <p><strong>动机/目标。</strong> 训练型早停贵，prompt/confidence 型方法不稳；attention 是现成内部信号。</p>
 <p><strong>缺陷/新问题。</strong> attention sink、层间重分配和头的语义差异使简单汇总不稳；attention 高不代表答案正确。跨模型需重新标定阈值，且改 decoding strategy 可能造成分布偏移。</p>
 <h3 id="26-ltf2606162222026-06-15">26. <a href="https://arxiv.org/abs/2606.16222">LTF</a>（2606.16222，2026-06-15）</h3>
+<p><strong>背景。</strong> 显式 CoT 的语言空间会把连续的思考过程切成离散 token，造成解码瓶颈；潜在推理可在连续空间中迭代，减少表面文字。但模型不能只找到一条偶然的高奖励路径，还要在正确性、路径长度和多样性之间合理分配不同潜在轨迹的概率。</p>
 <blockquote>
 <p>代码状态：未发现公开代码/项目页。</p>
 </blockquote>
@@ -275,6 +301,7 @@
 <p><strong>动机/目标。</strong> 现有 latent reasoning 只找单条 reward-max path，不会把不同正确率/成本的路径分配成后验。</p>
 <p><strong>缺陷/新问题。</strong> GFlowNet 训练复杂、稀疏答案监督困难；posterior reward 设计决定多样性，容易采到许多“便宜但相似”的路径。latent trajectory 难检查，数学错误可能被压缩成不可诊断的状态。</p>
 <h3 id="27-suco2606176872026-06-16">27. <a href="https://arxiv.org/abs/2606.17687">SuCo</a>（2606.17687，2026-06-16）</h3>
+<p><strong>背景。</strong> “短一点”并不等于“足够”：过度压缩会删掉解题所需的中间条件，固定的短、中、长模式也无法细致适应题目难度。更自然的目标是找到一条轨迹中最短但仍能导出正确答案的前缀，并让模型学会在连续难度范围内达到这个充分点。</p>
 <blockquote>
 <p>代码状态：未发现公开代码/项目页。</p>
 </blockquote>
@@ -282,6 +309,7 @@
 <p><strong>动机/目标。</strong> 固定 NoThink/Short/Long 档位粗糙；把“最短仍足够”作为可学习目标。</p>
 <p><strong>缺陷/新问题。</strong> MSC 标签依赖 verifier，且“答案正确”不代表推理过程充分/忠实；模型可能学会尽早输出答案再补解释。连续复杂度 tracker 的校准和训练开销尚未充分证明。</p>
 <h3 id="28-dre2606178902026-06-16">28. <a href="https://arxiv.org/abs/2606.17890">DRE</a>（2606.17890，2026-06-16）</h3>
+<p><strong>背景。</strong> GRPO 等强化学习方法常把整条 rollout 的最终正确性作为一个序列级奖励。这样一来，得到答案之后的无用续写也会和真正解决问题的前缀一起获得正反馈，训练过程可能逐步放大过度思考，因此需要把奖励归因到“答案出现前后”的不同片段。</p>
 <blockquote>
 <p>代码状态：未发现公开代码/项目页。</p>
 </blockquote>
@@ -289,6 +317,7 @@
 <p><strong>动机/目标。</strong> vanilla GRPO 把得到答案和答案后的验证一起奖励，早期微小 overthink 会被放大成训练反馈环。</p>
 <p><strong>缺陷/新问题。</strong> answer emergence parser/verifier 可能误判，prefix 太早会删除必要自纠错；编辑模型引入 off-policy artifact。依赖可验证数学答案，开放题无法精确定位“答案已出现”。</p>
 <h3 id="29-adapt-code2606199192026-06-18">29. <a href="https://arxiv.org/abs/2606.19919">ADaPT</a> · <a href="https://github.com/SpongeBob-0715/ADaPT_Token_Level_Decoupling">Code</a>（2606.19919，2026-06-18）</h3>
+<p><strong>背景。</strong> 长度奖励和正确性奖励通常作用在同一整条序列上，容易把“必要但较长的正确推理”也当成坏样本。理想的模型应先决定采用快速还是慢速思考，再在所选模式内自由生成满足任务的内容，所以需要在训练信号层面分离路由决策与答案质量。</p>
 <blockquote>
 <p>代码状态：官方代码。</p>
 </blockquote>
@@ -296,6 +325,7 @@
 <p><strong>动机/目标。</strong> sequence-level length reward 将“必要长推理”错误当成坏样本；把路由决策与内容正确性解耦。</p>
 <p><strong>缺陷/新问题。</strong> mode token 是粗粒度的二元/多元选择，无法处理题中途难度变化；路由概率调节需要校准。fast/slow 两种分布可能共享表示导致模式塌缩，且额外 token 的收益依赖训练数据覆盖。</p>
 <h3 id="30-quantization-inflates-reasoning2606255192026-06-24">30. <a href="https://arxiv.org/abs/2606.25519">Quantization Inflates Reasoning</a>（2606.25519，2026-06-24）</h3>
+<p><strong>背景。</strong> 低比特量化通常按每 token 延迟和最终准确率衡量收益，但推理模型的量化误差还可能改变思考行为，使它重复更多步骤或迟迟不愿结束。即使每步更快，额外生成的 token 也会抵消显存和吞吐方面的好处，因此需要单独测量量化造成的长度膨胀。</p>
 <blockquote>
 <p>代码状态：未发现公开代码/项目页。</p>
 </blockquote>
@@ -303,6 +333,7 @@
 <p><strong>动机/目标。</strong> 低比特每 token 更快，但如果多生成 30–50% token，总延迟/能耗可能不降。</p>
 <p><strong>缺陷/新问题。</strong> 主要是 measurement，不能告诉部署者该选哪个量化校准；token inflation 与 accuracy、batching、硬件 kernel 交织。只在输出层惩罚长度可能进一步放大量化错误。</p>
 <h3 id="31-dash2607004822026-07-01">31. <a href="https://arxiv.org/abs/2607.00482">DASH</a>（2607.00482，2026-07-01）</h3>
+<p><strong>背景。</strong> 过度思考的表现不只是“输出更长”，还包括反复犹豫、放弃已有方案、自相矛盾等无生产性自反思。逐步标注这些行为代价很高；如果轨迹中间会提交候选答案，就可以用候选答案是否更接近真值来间接判断后续反思是在改进还是在漂移。</p>
 <blockquote>
 <p>代码状态：未发现公开代码/项目页。</p>
 </blockquote>
@@ -310,6 +341,7 @@
 <p><strong>动机/目标。</strong> 冗余不是 token 数本身，而是“放弃已有答案、矛盾、hedging”等行为；逐步标注成本高，commitment 可替代。</p>
 <p><strong>缺陷/新问题。</strong> 训练时 ground truth 可用，部署时不可用；把 commitment 当正确性 proxy 会奖励过早自信。segment credit 可能抑制有益的反思，尤其在需要推翻初始直觉的难题上。</p>
 <h3 id="32-cat-code2607008622026-07-01">32. <a href="https://arxiv.org/abs/2607.00862">CAT</a> · <a href="https://github.com/Jiang9732/CAT-code">Code</a>（2607.00862，2026-07-01）</h3>
+<p><strong>背景。</strong> 对所有问题统一缩短 CoT 会伤害真正困难的题目，而只按外部难度标签分档又较粗糙。模型在生成过程中往往已经形成某种自我确信程度，这种内部信号若能校准，就可以让高把握的简单题更早结束，让低把握的题目保留更多思考。</p>
 <blockquote>
 <p>代码状态：官方代码。</p>
 </blockquote>
@@ -317,6 +349,7 @@
 <p><strong>动机/目标。</strong> uniform length reduction 在难题上伤害准确率；模型自身不确定性是无需额外 difficulty label 的路由信号。</p>
 <p><strong>缺陷/新问题。</strong> LRM 的 confidence 可能系统性过信，尤其量化、OOD 或错误但流畅的轨迹；偏好优化会把 calibration error 变成长度决策。简单题的高 confidence 也可能是 shortcut。</p>
 <h3 id="33-os-pruner2607110892026-07-13">33. <a href="https://arxiv.org/abs/2607.11089">OS-Pruner</a>（2607.11089，2026-07-13）</h3>
+<p><strong>背景。</strong> 固定思考预算或简单的正确性阈值都没有比较“继续生成的预期收益”和“多生成 token 的成本”。有些当前答案看似错误但继续推理仍可能纠正，另一些答案已足够可靠；因此早停应被视为一个逐前缀决定是否继续的最优停止问题。</p>
 <blockquote>
 <p>代码状态：未发现公开代码/项目页。</p>
 </blockquote>
@@ -324,6 +357,7 @@
 <p><strong>动机/目标。</strong> 固定预算、启发式过滤和 correctness threshold 会错过“当前答案错但继续能纠正”的状态；最优停止要比较继续的期望价值。</p>
 <p><strong>缺陷/新问题。</strong> 学到的 continuation value 受训练 horizon 和成本权重影响；policy head 误差在长链累积。论文主要是数学，&gt;20B 和代码/科学泛化未验证；停止后保留的 prefix 可能不可读。</p>
 <h3 id="34-token-budget-saturation2607214332026-07-23">34. <a href="https://arxiv.org/abs/2607.21433">Token-budget saturation</a>（2607.21433，2026-07-23）</h3>
+<p><strong>背景。</strong> 思考预算与准确率并非总是平滑增长：简单基准可能在很短预算就接近饱和，而部分难题会持续生成却始终无法收敛。平均准确率曲线会掩盖这种两极分化，因此需要先刻画预算饱和和不收敛的模式，再讨论能否在生成早期识别它们。</p>
 <blockquote>
 <p>代码状态：论文称接收后公开，当前未发布。</p>
 </blockquote>
@@ -331,6 +365,7 @@
 <p><strong>动机/目标。</strong> 说明平均难度不能决定预算，non-convergence 是可识别的失败模式。</p>
 <p><strong>缺陷/新问题。</strong> 研究主要单模型；“提前识别不收敛”仍未给出稳健在线特征。双峰可能来自 prompt、采样或 parser，不能直接推导统一动态预算。</p>
 <h3 id="35-demystifying-entropy-based-selection-code2607287072026-07-30">35. <a href="https://arxiv.org/abs/2607.28707">Demystifying Entropy-based Selection</a> · <a href="https://github.com/saracandussio/Demystifying-Entropy-Selection">Code</a>（2607.28707，2026-07-30）</h3>
+<p><strong>背景。</strong> 在自回归推理中，熵表示模型对下一个 token 的不确定程度，因此常被当作“哪些 token 更值得保留”的廉价代理。若低熵 token 被视为稳定且可删、高熵 token 被视为关键，就能做步骤或 token pruning；但数学链里的数字、运算符和答案片段可能天然低熵，必须先检验熵与真实推理贡献是否一致。</p>
 <blockquote>
 <p>代码状态：官方代码。</p>
 </blockquote>
@@ -338,6 +373,7 @@
 <p><strong>动机/目标。</strong> 纠正“entropy 就是重要性”的压缩假设。</p>
 <p><strong>缺陷/新问题。</strong> 它主要否定一种启发式，不提供新压缩器；激活 patch 的因果解释依赖模型/层。实际需要结构、语义和因果联合评分，而不是简单 entropy。</p>
 <h3 id="36-reco2608047712026-08-05">36. <a href="https://arxiv.org/abs/2608.04771">ReCo</a>（2608.04771，2026-08-05）</h3>
+<p><strong>背景。</strong> 长 CoT 解码时，历史 token 会以 key/value（KV）缓存留在模型中，缓存越大越占显存；压缩 KV 可以省内存，却可能改变模型后续生成。因而这类方法需要同时考虑中间步骤质量、缓存保留比例和是否继续生成，而不能只把缓存 token 数当成推理成本。</p>
 <blockquote>
 <p>代码状态：未发现公开代码/项目页。</p>
 </blockquote>
@@ -345,6 +381,7 @@
 <p><strong>动机/目标。</strong> cache 压缩不仅删除上下文，还会改变后续生成；只看保留率会高估收益。</p>
 <p><strong>缺陷/新问题。</strong> process reward 估计器本身是额外模型，错误 reward 会同时误导 cache 和长度；高 reward 不一定代表未来不再需要上下文。KV 操作的真实 GPU kernel 成本可能与 token 指标不一致。</p>
 <h3 id="37-shared-budget-exam-study-code2608079682026-08-08">37. <a href="https://arxiv.org/abs/2608.07968">Shared-budget exam study</a> · <a href="https://github.com/Fcr09/thinking-hard-not-smart">Code</a>（2608.07968，2026-08-08）</h3>
+<p><strong>背景。</strong> 在考试或批处理场景，总 token 预算由一组题目共享；简单题少想几步，可能把资源留给难题或高分题，整体得分才更高。这个问题不同于给每道题单独设停止器，本质上还涉及题目价值、难度和处理顺序之间的联合调度。</p>
 <blockquote>
 <p>代码状态：官方代码。</p>
 </blockquote>
@@ -352,6 +389,7 @@
 <p><strong>动机/目标。</strong> 单题最优长度不等于队列/考试总分最优；部署常受总延迟约束。</p>
 <p><strong>缺陷/新问题。</strong> 这是诊断基准，不是修复方法；分值设置会决定策略，且真实服务的到达顺序、截止期、并发不同。它提醒我们需要 knapsack/bandit 式调度，而不是只训练 per-query stopper。</p>
 <h3 id="38-funnel-of-thoughts2608150652026-08-15">38. <a href="https://arxiv.org/abs/2608.15065">Funnel of Thoughts</a>（2608.15065，2026-08-15）</h3>
+<p><strong>背景。</strong> Self-consistency 通过采样多条解题轨迹再投票提高准确率，但每条 rollout 都要支付完整的生成和 attention 成本。若轨迹中出现反复犹豫、撤销或无效分支，它们可能在最终投票前就已暴露低成功率，因此可以考虑在多路搜索层面剪掉无效 rollout。</p>
 <blockquote>
 <p>代码状态：未发现公开代码/项目页。</p>
 </blockquote>
@@ -359,6 +397,7 @@
 <p><strong>动机/目标。</strong> self-consistency 的瓶颈是无效 rollout，不一定要缩短每条链。</p>
 <p><strong>缺陷/新问题。</strong> 词法 marker 是语言/模板依赖，可能把真正有益的自纠错误删；攻击者可改写 marker。对数学语言不同、非英语或没有显式 hesitation 的模型迁移性未知。</p>
 <h3 id="39-evoresearcher-code2608188842026-08-19">39. <a href="https://arxiv.org/abs/2608.18884">EvoResearcher</a> · <a href="https://github.com/HAHA1122344/EvoResearcher">Code</a>（2608.18884，2026-08-19）</h3>
+<p><strong>背景。</strong> 自反思推理通常循环执行“生成答案—批评—修改”，能发现初稿错误，却也会把每轮批评和重写的 token 成本叠加起来。训练一个专门的反思策略代价较高，于是一个自然问题是：能否用冻结模型的自我评价决定何时确认答案，并给反思设置明确上限。</p>
 <blockquote>
 <p>代码状态：官方代码。</p>
 </blockquote>
@@ -366,6 +405,7 @@
 <p><strong>动机/目标。</strong> 避免昂贵 GRPO，用训练-free 自验证获取 bounded reflection。</p>
 <p><strong>缺陷/新问题。</strong> critique 与 answer 同源，确认 sentinel 可能是“自我同意”；每轮 critique 本身要生成 token，未必比直接长 CoT 便宜。tool diversity/agent extension 没有在论文实验中验证。</p>
 <h3 id="40-learning-when-to-think2608202562026-08-20">40. <a href="https://arxiv.org/abs/2608.20256">Learning When to Think</a>（2608.20256，2026-08-20）</h3>
+<p><strong>背景。</strong> 许多推理模型默认每道题都进入长思考模式，导致简单题过度计算；若统一缩短，又可能让难题没有足够搜索空间。一个更直接的思路是让模型先选择“不思考、短思考或长思考”模式，再按题目需要分配预算，但首个路由决定一旦错误就可能难以补救。</p>
 <blockquote>
 <p>代码状态：未发现公开代码/项目页。</p>
 </blockquote>
@@ -373,6 +413,7 @@
 <p><strong>动机/目标。</strong> 固定预算导致 easy overcompute、hard undercompute；无需单独 router。</p>
 <p><strong>缺陷/新问题。</strong> 三档离散路由不能中途增减预算；模式可能在别的模型/任务塌缩。首 token 决策没有看到解题过程，难题分类错后无法补救。</p>
 <h3 id="41-memory-augmented-compression2608212652026-08-21">41. <a href="https://arxiv.org/abs/2608.21265">Memory-Augmented Compression</a>（2608.21265，2026-08-21）</h3>
+<p><strong>背景。</strong> Chain-of-Draft 等方法把逐步解释压成更短的草稿，以减少解码 token；代价是一些可复用的中间模式、约束和操作也会被丢掉。若历史问题中已经出现相似解法，可以把这些信息预先放进上下文（prefill），用一次性读取来替代部分逐 token 生成（decode）。</p>
 <blockquote>
 <p>代码状态：未发现公开代码/项目页。</p>
 </blockquote>
@@ -380,6 +421,7 @@
 <p><strong>动机/目标。</strong> 压短当前链会丢掉可复用中间知识；把成本从逐 token 生成移到一次性 prefill。</p>
 <p><strong>缺陷/新问题。</strong> memory retrieval 错配会把别题策略注入当前题，且 context 变长可能吞噬 KV/首 token 延迟；“prefill 更便宜”的假设依赖硬件和 batch。历史解法有隐私/污染和 benchmark leakage 风险。</p>
 <h3 id="42-chainprune2608218602026-08-22">42. <a href="https://arxiv.org/abs/2608.21860">ChainPrune</a>（2608.21860，2026-08-22）</h3>
+<p><strong>背景。</strong> 多次采样会产生许多相似但不完全相同的推理路径。逐条压缩容易重复计算，也可能误删某一条证明所独有的关键分支；把路径组织成共享前缀和分支的树后，可合并相似节点，再在质量与长度之间选择更优路径。</p>
 <blockquote>
 <p>代码状态：未发现公开代码/项目页。</p>
 </blockquote>
@@ -387,6 +429,7 @@
 <p><strong>动机/目标。</strong> 只惩罚 token 会产生 pseudo-conciseness：字数少了，重复逻辑还在；树结构可共享前缀并保留分支信息。</p>
 <p><strong>缺陷/新问题。</strong> 树合并的 cosine/entropy 阈值是启发式，错误合并会把不同证明分支混为一谈；DPO 的 log-prob 梯度纠缠可能同时降低 chosen/rejected，论文自己观察理想梯度条件罕见。离线多路径搜索昂贵。</p>
 <h3 id="43-token-economy-score-code2608262352026-08-26">43. <a href="https://arxiv.org/abs/2608.26235">Token Economy Score</a> · <a href="https://github.com/Sachin-Wani/reasoning_tax">Code</a>（2608.26235，2026-08-26）</h3>
+<p><strong>背景。</strong> 仅报告数学准确率无法回答“多生成这些思考 token 是否值得”，因为不同模型和任务的额外计算成本差异很大。需要把带推理与基线模式的准确率增益，与长度、延迟或部署成本放在同一指标中比较，才能判断 reasoning effort 的边际收益。</p>
 <blockquote>
 <p>代码状态：官方代码。</p>
 </blockquote>
@@ -394,6 +437,7 @@
 <p><strong>动机/目标。</strong> accuracy-only benchmark 不回答“额外 thinking 值不值”；为模型选择和部署提供经济指标。</p>
 <p><strong>缺陷/新问题。</strong> base model 配对、tokenizer、硬件价格会改变分母；线性 token multiplier 忽略 KV、并行采样和服务 batching。TES 是评测指标，不会自动降低冗余，且可能鼓励牺牲难题准确率换高分。</p>
 <h3 id="44-aera2608279642026-08-28">44. <a href="https://arxiv.org/abs/2608.27964">AERA</a>（2608.27964，2026-08-28）</h3>
+<p><strong>背景。</strong> 常见早停器把当前答案置信度升高当作“继续思考也没用”的信号，但推理中的置信度可能先升后降：后续步骤会纠错，也可能把暂时正确的答案推翻。因此停止决策应估计“从当前前缀继续生成还能挽回多少正确率”，而不是只看当前 checkpoint。</p>
 <blockquote>
 <p>代码状态：未发现公开代码/项目页。</p>
 </blockquote>
@@ -401,6 +445,7 @@
 <p><strong>动机/目标。</strong> checkpoint correctness 非单调：证据变强后仍可能崩，变弱后也可能恢复。</p>
 <p><strong>缺陷/新问题。</strong> 95.99% 的极端节省需要强基线/增量设置，不能直接外推到单条长 CoT；离线 future-value 标签会产生 selection bias。控制器在新模型、不同温度和高难题上的 calibrated residual value 未知。</p>
 <h3 id="45-its-the-problem-not-the-path-code2609034362026-09-02">45. <a href="https://arxiv.org/abs/2609.03436">It's the Problem, Not the Path</a> · <a href="https://github.com/bulutyigit/problem-not-path">Code</a>（2609.03436，2026-09-02）</h3>
+<p><strong>背景。</strong> 观察到某条 CoT 前缀有效，并不代表这条路径本身创造了新解；它可能只是让模型重复了已经由题目或前缀提供的计算。通过在相同总 token 预算下比较继续当前前缀与从头重启，才能区分路径复用带来的收益和题目本身容易求解的影响。</p>
 <blockquote>
 <p>代码状态：官方代码。</p>
 </blockquote>
@@ -408,6 +453,7 @@
 <p><strong>动机/目标。</strong> 反驳把早期 trace 的“突破点/命运”当作可预测内部信号；控制题目难度混淆。</p>
 <p><strong>缺陷/新问题。</strong> 小模型、89 MATH 样本限制外推；它是方法论诊断而非 stopper。结论意味着很多短化收益来自复用已有计算，不能据此断言 latent reasoning 能发现新解。</p>
 <h3 id="46-arsm-code2609328522026-09-26">46. <a href="https://arxiv.org/abs/2609.32852">ARSM</a> · <a href="https://github.com/leo-xfm/ARSM">Code</a>（2609.32852，2026-09-26）</h3>
+<p><strong>背景。</strong> 长程 agent 会不断把网页操作、工具结果和中间计划写入上下文，纯文本摘要容易抹掉假设与行动结果之间的关系，最终造成 attention 稀释。结构化的“假设—动作—结果”状态可作为可更新记忆，帮助后续决策只读取关键关系；其适用性需要与数学证明的细粒度依赖区分。</p>
 <blockquote>
 <p>代码状态：官方代码。</p>
 </blockquote>
@@ -415,6 +461,7 @@
 <p><strong>动机/目标。</strong> agent context 持续增长，普通摘要丢结构关系，导致 attention collapse；结构化状态比纯文本总结更稳。</p>
 <p><strong>缺陷/新问题。</strong> 不是数学 CoT 专门方法，证据来自 Webshop/Multi-hop/SWE；HAR 抽象可能丢掉数学证明的细粒度条件。状态机错误会持久化污染未来决策，且训练-free 并不意味着无额外摘要 token。</p>
 <h3 id="47-tokenprobe2609339702026-09-27">47. <a href="https://arxiv.org/abs/2609.33970">TokenProbe</a>（2609.33970，2026-09-27）</h3>
+<p><strong>背景。</strong> 推理链中的 token 作用并不均匀：低概率的“等等、重新计算”可能正是纠错转折点，而高概率的模板句可能只是填充。若训练时只按总长度惩罚，模型会连同关键探索一起删除，所以需要先估计每个 token 对后续答案的相对价值。</p>
 <blockquote>
 <p>代码状态：未发现公开代码/项目页。</p>
 </blockquote>
@@ -422,6 +469,7 @@
 <p><strong>动机/目标。</strong> token 价值高度不均，长度惩罚把关键低概率自纠错一起杀掉。</p>
 <p><strong>缺陷/新问题。</strong> 置信与价值是相关而非因果；重复错误可能高概率，训练 regime 改变后 confidence–correctness 关系会反转。依赖生成策略和 logprob 可见性，需每个 checkpoint 重新验证，且过度保留高概率模板会降低探索。</p>
 <h3 id="48-ratio-code2609398012026-09-30">48. <a href="https://arxiv.org/abs/2609.39801">RATIO</a> · <a href="https://github.com/steven-bao1/RATIO">Code</a>（2609.39801，2026-09-30）</h3>
+<p><strong>背景。</strong> 量化把模型权重从高精度改成低比特表示，可能改变 token 概率和停止行为；某些量化模型因此反复生成 Wait、Actually 等自纠片段。固定删除这些词并不稳健，因为不同模型受影响的 token 不同，必须先对比全精度参考与量化模型的行为差异。</p>
 <blockquote>
 <p>代码状态：官方代码。</p>
 </blockquote>
@@ -429,6 +477,7 @@
 <p><strong>动机/目标。</strong> 固定 <code>Wait/Actually</code> marker 不适应不同量化模型；希望只惩罚量化诱发的特定 token。</p>
 <p><strong>缺陷/新问题。</strong> 需要同时运行 full-precision teacher，部署节省被 teacher 比较抵消；token discrepancy 不一定表示冗余，可能是量化模型真正需要的纠错。对没有 FP reference 的边缘部署不可用。</p>
 <h3 id="49-cask-core-aware-selective-kv-compression-for-reasoning-traces2604109002026-04-13">49. <a href="https://arxiv.org/abs/2604.10900">CASK: Core-Aware Selective KV Compression for Reasoning Traces</a>（2604.10900，2026-04-13，邻接）</h3>
+<p><strong>背景。</strong> 自回归模型把每个历史 token 的 key/value 存入 KV cache，以免每一步重新计算；长推理会让该缓存持续膨胀。缓存中的 token 作用并不相同：有些承载答案约束或关键中间量，有些只是可合并的草稿，因此压缩前需要区分必须保护的 core 与可整理的 scratch。</p>
 <blockquote>
 <p>代码状态：仅发现外部基线仓库，非本文代码。</p>
 </blockquote>
@@ -436,11 +485,13 @@
 <p><strong>动机/目标。</strong> 仅改 scorer 不会改变 keep-set；行为保持的结构合并比排名淘汰更适合长推理。</p>
 <p><strong>缺陷/新问题。</strong> core/scratch 的边界依赖任务和答案形成阶段；合并 scratch 可能破坏跨步引用。主要报告 KV continuation fidelity，不等于完整数学准确率和端到端成本。</p>
 <h3 id="50-reasonalloccask">50. ReasonAlloc/CASK 类系统工作的共同边界</h3>
+<p><strong>背景。</strong> 系统层面，删掉缓存 token 可能减少显存，却也可能让模型失去上下文并生成更长的补偿轨迹；相反，保留上下文可能减少重算但增加 KV 操作。真实成本应同时计入 prefill、decode 和缓存读写，而不能用最终 CoT 长度或缓存保留率单独代表。</p>
 <blockquote>
 <p>代码状态：综合边界项，无单篇论文或独立代码仓库。</p>
 </blockquote>
 <p>二者都说明“缓存 token 数”与“推理 token 数”是耦合的：保留更多上下文可能减少重算，删得太多会诱发更长轨迹。部署时应报告 \(\text{latency}=T_{prefill}+T_{decode}+T_{KV\ ops}\)，不能只报告 CoT 长度。它们是数学推理效率的系统层补充，而非替代语义压缩。</p>
 <h3 id="51-longcotthought-streams-token">51. 近半年邻接诊断：LongCoT、Thought Streams、共享预算与深思 token</h3>
+<p><strong>背景。</strong> 近年的邻接工作分别从超长 horizon 基准、连续 thought stream 和跨层“深思 token”刻画推理，反复指出 raw token 数不等于有效计算量：有的长链很早已收敛，有的短链包含关键修订。因此理解早停或压缩方法前，需要区分表面长度、实际修订/搜索 effort 与最终正确性。</p>
 <p><strong>条目拆分与代码状态：</strong></p>
 <ul>
 <li><a href="https://arxiv.org/abs/2604.14140">LongCoT: Benchmarking Long-Horizon Chain-of-Thought Reasoning</a> · <a href="https://github.com/LongHorizonReasoning/longcot">Code</a> · 官方代码</li>
